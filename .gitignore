@@ -1,0 +1,5 @@
+*.py[co]
+*.tmp
+*.pdf
+cache
+.idea
