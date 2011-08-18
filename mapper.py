@@ -1,13 +1,17 @@
 #!/usr/bin/env python
 # coding: utf-8
+
 from math import floor
 from optparse import OptionParser
 
 from reportlab.lib.units import cm, mm, inch
+from reportlab.pdfbase import pdfmetrics, ttfonts
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.lib.pagesizes import A4, A3, landscape
 import Image
 from gmap import TILE_SIZE, lonlat_to_pixel, get_tile
+
+PEREKR = 0.8
 
 __author__ = 'madrider'
 
@@ -28,9 +32,9 @@ def dms2deg(d, m, s):
     return d + m / 60. + s / 3600.
 
 def main():
-    dpi = int(opts.dpi)
+    FONT = 'Droid'
+    pdfmetrics.registerFont(ttfonts.TTFont(FONT, 'DroidSansMono.ttf'))
     page_size = A4
-    title = 'Kannelyarvi'
     try:
         c1 = map(lambda x: float(x), opts.c1.split(',', 1))
         c2 = map(lambda x: float(x), opts.c2.split(',', 1))
@@ -48,8 +52,6 @@ def main():
 
     # size of map
     mapw, maph = (tx2 - tx1) * TILE_SIZE, (ty1 - ty2) * TILE_SIZE
-    if mapw > maph:
-        page_size = landscape(page_size)
     print "got %i x %i map" % (mapw, maph)
 
     c = Canvas(opts.filename, pagesize=page_size)
@@ -58,25 +60,25 @@ def main():
     xp1, yp1 = page_border, page_border
     xp2, yp2 = maxx - page_border, maxy - page_border
     yp2 -= 10 + 14 # for page title
-    # picture size we need to fit dpi
-    imgw, imgh = map(lambda x: int(x / inch * dpi), (xp2 - xp1, yp2 - yp1))
+
+    imgw = int(mapw / (1 + (opts.numx - 1) * PEREKR))
+    imgh = int((yp2 - yp1) / (xp2 - xp1) * imgw)
     print "need %i x %i image for 1 page" % (imgw, imgh)
 
-
     # glue tiles to big picture
-    map_img = Image.new("RGB", (abs(tx2 - tx1) * TILE_SIZE, abs(ty2 - ty1) * TILE_SIZE), (200, 200, 200))
-    for ty in range(min(ty1, ty2), max(ty1, ty2) + 1):
+    map_img = Image.new("RGBA", ((tx2 - tx1) * TILE_SIZE, (ty1 - ty2) * TILE_SIZE), (200, 200, 200))
+    for ty in range(ty2, ty1):
         for tx in range(tx1, tx2 + 1):
             fname = get_tile(tx, ty, zoom)
             #print fname
             try:
                 img1 = Image.open(fname)
             except:
-                img1 = Image.new("RGB", (256, 256))
+                img1 = Image.new("RGBA", (256, 256))
             xp, yp = TILE_SIZE * (tx - tx1), TILE_SIZE * (ty - min(ty1, ty2))
             map_img.paste(img1, (xp, yp))
-
-    koeff = dpi / inch
+    map_img.save("map.jpg", "JPEG")
+    koeff = float(imgw) / (xp2 - xp1)
     # pixels in deg of x axis (lon)
     pdegx = lonlat_to_pixel(lat1, lon1 + 1, zoom)[0] - lonlat_to_pixel(lat1, lon1, zoom)[0]
     pdegx /= koeff # to pdf pixels
@@ -89,26 +91,26 @@ def main():
     pdegy = abs(lonlat_to_pixel(lat1 + 1, lon1, zoom)[1] - lonlat_to_pixel(lat1, lon1, zoom)[1])
     pdegy /= koeff # to pdf pixels
     d_deg_y = 1
-    for i in (dms2deg(0, 30, 0), dms2deg(0, 10, 0), dms2deg(0, 1, 0), dms2deg(0, 0, 30), dms2deg(0, 0, 10), dms2deg(0, 0, 5)):
+    for i in (dms2deg(0, 30, 0), dms2deg(0, 10, 0), dms2deg(0, 1, 0), dms2deg(0, 0, 30), dms2deg(0, 0, 10), dms2deg(0, 0, 5), dms2deg(0, 0, 2), dms2deg(0, 0, 1)):
         if i * pdegy < 1 * cm:
             break
         d_deg_y = i
     #print deg2dms(d_deg_x), deg2dms(d_deg_y)
-    
+    numpages = 0
     dy = 0
     py = 1
-    while dy < maph:
+    while dy  + imgh * (1 - PEREKR) * 1.05 <= maph:
         dx = 0
         px = 1
-        while dx < mapw:
-            c.setFontSize(10)
-            c.drawString(page_border, maxy - page_border - 10, '%s, page %s-%s' % (title, px, py))
-
+        while dx + imgw * (1 - PEREKR) * 1.05 <= mapw:
+            numpages += 1
+            c.setFont(FONT, 10)
+            c.drawString(page_border, maxy - page_border - 10, '%s, page %s-%s' % (opts.title, px, py))
             tmpw, tmph = min(imgw, mapw - dx), min(imgh, maph - dy)
             img11 = map_img.crop((dx, dy, dx + tmpw, dy + tmph))
-            img11.copy()
+            img11.load()
             if tmpw < imgw or tmph < imgh:
-                img1 = Image.new("RGB", (imgw, imgh), (250, 250, 250))
+                img1 = Image.new("RGBA", (imgw, imgh), (250, 250, 250))
                 img1.paste(img11, (0, 0))
             else:
                 img1 = img11
@@ -141,11 +143,11 @@ def main():
                     c.setLineWidth(1)
                     c.setStrokeColorRGB(0, 0, 0)
                 c.line(xp + xp1, yp1, xp + xp1, yp2)
-                c.setFontSize(5)
+                c.setFont(FONT, 5)
                 if opts.deg:
                     text = "%.4f" % degx
                 else:
-                    text = "%iº%i'%i\"" % (d, m, round(s))
+                    text = "%iº%0.2i'%0.2i\"" % (d, m, round(s))
                 c.drawCentredString(xp + xp1, yp1 - 5, text)
                 c.drawCentredString(xp + xp1, yp2 + 5, text)
             # draw y grid
@@ -171,11 +173,11 @@ def main():
                     c.setLineWidth(1)
                     c.setStrokeColorRGB(0, 0, 0)
                 c.line(xp1, yp2 - yp, xp2, yp2 - yp)
-                c.setFontSize(5)
+                c.setFont(FONT, 5)
                 if opts.deg:
                     text = "%.4f" % degy
                 else:
-                    text = "%iº%i'%i\"" % (d, m, round(s))
+                    text = "%iº%0.2i'%0.2i\"" % (d, m, round(s))
                 c.saveState()
                 c.translate(xp1 - 5, yp2 - yp)
                 c.rotate(90)
@@ -187,11 +189,12 @@ def main():
                 c.drawCentredString(0, 0, text)
                 c.restoreState()
             c.showPage()
-            dx += int(imgw * 0.9)
+            dx += int(imgw * PEREKR)
             px += 1
-        dy += int(imgh * 0.9)
+        dy += int(imgh * PEREKR)
         py += 1
     c.save()
+    print "%s pages in pdf" % numpages
 
 if __name__ == '__main__':
     global opts
@@ -199,16 +202,21 @@ if __name__ == '__main__':
     parser = OptionParser()
     parser.add_option("-f", "--file", dest="filename",
                   help="output pdf name", metavar="FILE", default="map.pdf")
+    parser.add_option("-t", "--title", dest="title",
+                  help="map title", default="Каннельярви")
     parser.add_option("--coords1", dest="c1",
                   help="lover bottom corner", metavar="lat1,lon1", default="60.3167,29.35")
     parser.add_option("--coords2", dest="c2",
                   help="upper top corner", metavar="lat2,lon2", default="60.33,29.38")
     parser.add_option("-z", "--zoom", dest="zoom",
                   help="zoom (10-18)", metavar="n", type="int", default="17")
-    parser.add_option("-d", "--dpi", dest="dpi",
-                  help="dpi", metavar="n", type="int", default="200")
     parser.add_option("--deg", dest="deg", action="store_true",
                   help="use d.dddd instead of d mm' s.sss", default=False)
+    parser.add_option("--pages_x", dest="numx", type="int",
+                  help="fit in n pages with", default=2)
+    parser.add_option("--pages_y", dest="numy", type="int",
+                  help="fit in n pages height", default=0)
+
 
     opts, args = parser.parse_args()
 

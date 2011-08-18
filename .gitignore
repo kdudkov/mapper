@@ -1,5 +1,6 @@
+.idea
 *.py[co]
 *.tmp
 *.pdf
+*.jpg
 cache
-.idea
