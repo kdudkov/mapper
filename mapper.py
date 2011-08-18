@@ -125,10 +125,10 @@ def main():
                     break
                 xp = (x - dx) / koeff
                 d, m, s = deg2dms(degx)
-                if m == 0 and s < 0.0001:
+                if m == 0 and (s < 0.0001 or s > 59.9999):
                     c.setLineWidth(3)
                     c.setStrokeColorRGB(1, 0, 0)
-                elif s < 0.0001:
+                elif s < 0.0001 or s > 59.9999:
                     c.setLineWidth(2)
                     c.setStrokeColorRGB(0, 1, 0)
                 else:
@@ -136,7 +136,7 @@ def main():
                     c.setStrokeColorRGB(0, 0, 0)
                 c.line(xp + xp1, yp1, xp + xp1, yp2)
                 c.setFontSize(5)
-                text = "%iº%i'%i\"" % (d, m, s)
+                text = "%iº%i'%i\"" % (d, m, round(s))
                 #text = "%.4f" % degx
                 c.drawCentredString(xp + xp1, yp1 - 5, text)
                 c.drawCentredString(xp + xp1, yp2 + 5, text)
@@ -153,7 +153,7 @@ def main():
                     break
                 yp = (y - dy) / koeff
                 d, m, s = deg2dms(degy)
-                if m == 0 and s < 0.0001:
+                if m == 0 and (s < 0.0001 or s > 59.9999):
                     c.setLineWidth(3)
                     c.setStrokeColorRGB(1, 0, 0)
                 elif s < 0.0001:
@@ -164,7 +164,7 @@ def main():
                     c.setStrokeColorRGB(0, 0, 0)
                 c.line(xp1, yp2 - yp, xp2, yp2 - yp)
                 c.setFontSize(5)
-                text = "%iº%i'%i\"" % (d, m, s)
+                text = "%iº%i'%i\"" % (d, m, round(s))
                 #text = "%.4f" % degy
                 c.saveState()
                 c.translate(xp1 - 5, yp2 - yp)
