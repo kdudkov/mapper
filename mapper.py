@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 from math import floor
+from optparse import OptionParser
 
 from reportlab.lib.units import cm, mm, inch
 from reportlab.pdfgen.canvas import Canvas
@@ -18,24 +19,29 @@ def deg2dms(deg):
     m = int(dd)
     dd -= m
     s = dd * 60
+    if s > 59.999:
+        s = 0
+        m += 1
     return d, m, s
 
 def dms2deg(d, m, s):
     return d + m / 60. + s / 3600.
 
 def main():
-    dpi = 200
+    dpi = int(opts.dpi)
     page_size = A4
     title = 'Kannelyarvi'
-    # kanni
-    lat1, lon1 = 60.3167, 29.35
-    lat2, lon2 = 60.33, 29.38
-    a, b = lat1, lat2
-    lat1, lat2 = min(a, b), max(a, b)
-    a, b = lon1, lon2
-    lon1, lon2 = min(a, b), max(a, b)
+    try:
+        c1 = map(lambda x: float(x), opts.c1.split(',', 1))
+        c2 = map(lambda x: float(x), opts.c2.split(',', 1))
+    except:
+        print "smth wrong in command line!"
+        return 1
 
-    zoom = 17
+    lat1, lat2 = min(c1[0], c2[0]), max(c1[0], c2[0])
+    lon1, lon2 = min(c1[1], c2[1]), max(c1[1], c2[1])
+
+    zoom = opts.zoom
     x2tx = lambda x: int(x / TILE_SIZE)
     tx1, ty1 = map(x2tx, lonlat_to_pixel(lat1, lon1, zoom))
     tx2, ty2 = map(x2tx, lonlat_to_pixel(lat2, lon2, zoom))
@@ -46,7 +52,7 @@ def main():
         page_size = landscape(page_size)
     print "got %i x %i map" % (mapw, maph)
 
-    c = Canvas('map1.pdf', pagesize=page_size)
+    c = Canvas(opts.filename, pagesize=page_size)
     maxx, maxy = page_size
     page_border = 1 * cm
     xp1, yp1 = page_border, page_border
@@ -125,10 +131,10 @@ def main():
                     break
                 xp = (x - dx) / koeff
                 d, m, s = deg2dms(degx)
-                if m == 0 and (s < 0.0001 or s > 59.9999):
+                if m == 0 and s < 0.0001:
                     c.setLineWidth(3)
                     c.setStrokeColorRGB(1, 0, 0)
-                elif s < 0.0001 or s > 59.9999:
+                elif s < 0.0001:
                     c.setLineWidth(2)
                     c.setStrokeColorRGB(0, 1, 0)
                 else:
@@ -136,8 +142,10 @@ def main():
                     c.setStrokeColorRGB(0, 0, 0)
                 c.line(xp + xp1, yp1, xp + xp1, yp2)
                 c.setFontSize(5)
-                text = "%iº%i'%i\"" % (d, m, round(s))
-                #text = "%.4f" % degx
+                if opts.deg:
+                    text = "%.4f" % degx
+                else:
+                    text = "%iº%i'%i\"" % (d, m, round(s))
                 c.drawCentredString(xp + xp1, yp1 - 5, text)
                 c.drawCentredString(xp + xp1, yp2 + 5, text)
             # draw y grid
@@ -164,8 +172,10 @@ def main():
                     c.setStrokeColorRGB(0, 0, 0)
                 c.line(xp1, yp2 - yp, xp2, yp2 - yp)
                 c.setFontSize(5)
-                text = "%iº%i'%i\"" % (d, m, round(s))
-                #text = "%.4f" % degy
+                if opts.deg:
+                    text = "%.4f" % degy
+                else:
+                    text = "%iº%i'%i\"" % (d, m, round(s))
                 c.saveState()
                 c.translate(xp1 - 5, yp2 - yp)
                 c.rotate(90)
@@ -184,5 +194,23 @@ def main():
     c.save()
 
 if __name__ == '__main__':
+    global opts
+
+    parser = OptionParser()
+    parser.add_option("-f", "--file", dest="filename",
+                  help="output pdf name", metavar="FILE", default="map.pdf")
+    parser.add_option("--coords1", dest="c1",
+                  help="lover bottom corner", metavar="lat1,lon1", default="60.3167,29.35")
+    parser.add_option("--coords2", dest="c2",
+                  help="upper top corner", metavar="lat2,lon2", default="60.33,29.38")
+    parser.add_option("-z", "--zoom", dest="zoom",
+                  help="zoom (10-18)", metavar="n", type="int", default="17")
+    parser.add_option("-d", "--dpi", dest="dpi",
+                  help="dpi", metavar="n", type="int", default="200")
+    parser.add_option("--deg", dest="deg", action="store_true",
+                  help="use d.dddd instead of d mm' s.sss", default=False)
+
+    opts, args = parser.parse_args()
+
     main()
   
