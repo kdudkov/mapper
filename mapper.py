@@ -3,6 +3,7 @@
 
 from math import floor
 from optparse import OptionParser
+import ImageEnhance
 
 from reportlab.lib.units import cm, mm, inch
 from reportlab.pdfbase import pdfmetrics, ttfonts
@@ -30,6 +31,17 @@ def deg2dms(deg):
 
 def dms2deg(d, m, s):
     return d + m / 60. + s / 3600.
+
+def enhance(im, brightness=1.0, contrast=1.0, saturation=1.0, sharpness=1.0):
+    if brightness != 1.0:
+        im = ImageEnhance.Brightness(im).enhance(brightness)
+    elif contrast != 1.0:
+        im = ImageEnhance.Contrast(im).enhance(contrast)
+    if saturation != 1.0:
+        im = ImageEnhance.Color(im).enhance(saturation)
+    if sharpness != 1.0:
+        im = ImageEnhance.Sharpness(im).enhance(sharpness)
+    return im
 
 def main():
     DMS_GRID = (dms2deg(0, 30, 0), dms2deg(0, 10, 0), dms2deg(0, 1, 0), dms2deg(0, 0, 30), dms2deg(0, 0, 10), dms2deg(0, 0, 5), dms2deg(0, 0, 2), dms2deg(0, 0, 1))
@@ -80,6 +92,7 @@ def main():
                 img1 = Image.new("RGBA", (256, 256), (200, 255, 200))
             xp, yp = TILE_SIZE * (tx - tx1), TILE_SIZE * (ty - min(ty1, ty2))
             map_img.paste(img1, (xp, yp))
+    map_img = enhance(map_img, contrast=opts.contrast, brightness=opts.bright)
     map_img.save("map.jpg", "JPEG")
     koeff = float(imgw) / (xp2 - xp1)
     # pixels in deg of x axis (lon)
@@ -221,8 +234,8 @@ if __name__ == '__main__':
                   help="fit in n pages height", default=0)
     parser.add_option("--land", dest="land", action="store_true",
                   help="landscape page orientation", default=False)
-
-
+    parser.add_option("--contrast", dest="contrast", type="float", default=1.5)
+    parser.add_option("--bright", dest="bright", type="float", default=1.5)
     opts, args = parser.parse_args()
 
     main()
