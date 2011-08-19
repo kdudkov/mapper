@@ -32,9 +32,12 @@ def dms2deg(d, m, s):
     return d + m / 60. + s / 3600.
 
 def main():
+    DMS_GRID = (dms2deg(0, 30, 0), dms2deg(0, 10, 0), dms2deg(0, 1, 0), dms2deg(0, 0, 30), dms2deg(0, 0, 10), dms2deg(0, 0, 5), dms2deg(0, 0, 2), dms2deg(0, 0, 1))
     FONT = 'Droid'
     pdfmetrics.registerFont(ttfonts.TTFont(FONT, 'DroidSansMono.ttf'))
     page_size = A4
+    if opts.land:
+        page_size = landscape(page_size)
     try:
         c1 = map(lambda x: float(x), opts.c1.split(',', 1))
         c2 = map(lambda x: float(x), opts.c2.split(',', 1))
@@ -74,7 +77,7 @@ def main():
             try:
                 img1 = Image.open(fname)
             except:
-                img1 = Image.new("RGBA", (256, 256))
+                img1 = Image.new("RGBA", (256, 256), (200, 255, 200))
             xp, yp = TILE_SIZE * (tx - tx1), TILE_SIZE * (ty - min(ty1, ty2))
             map_img.paste(img1, (xp, yp))
     map_img.save("map.jpg", "JPEG")
@@ -83,7 +86,7 @@ def main():
     pdegx = lonlat_to_pixel(lat1, lon1 + 1, zoom)[0] - lonlat_to_pixel(lat1, lon1, zoom)[0]
     pdegx /= koeff # to pdf pixels
     d_deg_x = 1
-    for i in (dms2deg(0, 10, 0), dms2deg(0, 1, 0), dms2deg(0, 0, 30), dms2deg(0, 0, 10), dms2deg(0, 0, 5)):
+    for i in DMS_GRID:
         if i * pdegx < 1 * cm:
             break
         d_deg_x = i
@@ -91,7 +94,7 @@ def main():
     pdegy = abs(lonlat_to_pixel(lat1 + 1, lon1, zoom)[1] - lonlat_to_pixel(lat1, lon1, zoom)[1])
     pdegy /= koeff # to pdf pixels
     d_deg_y = 1
-    for i in (dms2deg(0, 30, 0), dms2deg(0, 10, 0), dms2deg(0, 1, 0), dms2deg(0, 0, 30), dms2deg(0, 0, 10), dms2deg(0, 0, 5), dms2deg(0, 0, 2), dms2deg(0, 0, 1)):
+    for i in DMS_GRID:
         if i * pdegy < 1 * cm:
             break
         d_deg_y = i
@@ -216,6 +219,8 @@ if __name__ == '__main__':
                   help="fit in n pages with", default=2)
     parser.add_option("--pages_y", dest="numy", type="int",
                   help="fit in n pages height", default=0)
+    parser.add_option("--land", dest="land", action="store_true",
+                  help="landscape page orientation", default=False)
 
 
     opts, args = parser.parse_args()
