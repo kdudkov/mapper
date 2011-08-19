@@ -45,6 +45,10 @@ def enhance(im, brightness=1.0, contrast=1.0, saturation=1.0, sharpness=1.0):
 
 def main():
     DMS_GRID = (dms2deg(0, 30, 0), dms2deg(0, 10, 0), dms2deg(0, 1, 0), dms2deg(0, 0, 30), dms2deg(0, 0, 10), dms2deg(0, 0, 5), dms2deg(0, 0, 2), dms2deg(0, 0, 1))
+    D_GRID = [1]
+    for i in range(1, 5):
+        for c in [5, 2, 1]:
+            D_GRID.append(c * pow(10, -i))
     FONT = 'Droid'
     pdfmetrics.registerFont(ttfonts.TTFont(FONT, 'DroidSansMono.ttf'))
     page_size = A4
@@ -98,8 +102,12 @@ def main():
     # pixels in deg of x axis (lon)
     pdegx = lonlat_to_pixel(lat1, lon1 + 1, zoom)[0] - lonlat_to_pixel(lat1, lon1, zoom)[0]
     pdegx /= koeff # to pdf pixels
+    if opts.deg:
+        grid = D_GRID
+    else:
+        grid = DMS_GRID
     d_deg_x = 1
-    for i in DMS_GRID:
+    for i in grid:
         if i * pdegx < 1 * cm:
             break
         d_deg_x = i
@@ -107,7 +115,7 @@ def main():
     pdegy = abs(lonlat_to_pixel(lat1 + 1, lon1, zoom)[1] - lonlat_to_pixel(lat1, lon1, zoom)[1])
     pdegy /= koeff # to pdf pixels
     d_deg_y = 1
-    for i in DMS_GRID:
+    for i in grid:
         if i * pdegy < 1 * cm:
             break
         d_deg_y = i
@@ -230,8 +238,8 @@ if __name__ == '__main__':
                   help="use d.dddd instead of d mm' s.sss", default=False)
     parser.add_option("--pages_x", dest="numx", type="int",
                   help="fit in n pages with", default=2)
-    parser.add_option("--pages_y", dest="numy", type="int",
-                  help="fit in n pages height", default=0)
+#    parser.add_option("--pages_y", dest="numy", type="int",
+#                  help="fit in n pages height", default=0)
     parser.add_option("--land", dest="land", action="store_true",
                   help="landscape page orientation", default=False)
     parser.add_option("--contrast", dest="contrast", type="float", default=1.5)
