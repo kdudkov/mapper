@@ -78,7 +78,7 @@ def main():
     page_border = 1 * cm
     xp1, yp1 = page_border, page_border
     xp2, yp2 = maxx - page_border, maxy - page_border
-    yp2 -= 10 + 14 # for page title
+    yp2 -= 10 + 30 # for page title
 
     imgw = int(mapw / (1 + (opts.numx - 1) * PEREKR))
     imgh = int((yp2 - yp1) / (xp2 - xp1) * imgw)
@@ -98,10 +98,11 @@ def main():
             map_img.paste(img1, (xp, yp))
     map_img = enhance(map_img, contrast=opts.contrast, brightness=opts.bright)
     map_img.save("map.jpg", "JPEG")
-    koeff = float(imgw) / (xp2 - xp1)
+    koeffx = float(imgw) / (xp2 - xp1)
+    koeffy = float(imgh) / (yp2 - yp1)
     # pixels in deg of x axis (lon)
     pdegx = lonlat_to_pixel(lat1, lon1 + 1, zoom)[0] - lonlat_to_pixel(lat1, lon1, zoom)[0]
-    pdegx /= koeff # to pdf pixels
+    pdegx /= koeffx # to pdf pixels
     if opts.deg:
         grid = D_GRID
     else:
@@ -113,7 +114,7 @@ def main():
         d_deg_x = i
     # pixels in deg of y axis (lat)
     pdegy = abs(lonlat_to_pixel(lat1 + 1, lon1, zoom)[1] - lonlat_to_pixel(lat1, lon1, zoom)[1])
-    pdegy /= koeff # to pdf pixels
+    pdegy /= koeffy # to pdf pixels
     d_deg_y = 1
     for i in grid:
         if i * pdegy < 1 * cm:
@@ -155,7 +156,7 @@ def main():
                     continue
                 if x >= dx + tmpw:
                     break
-                xp = (x - dx) / koeff
+                xp = (x - dx) / koeffx
                 d, m, s = deg2dms(degx)
                 if m == 0 and s < 0.0001:
                     c.setLineWidth(3)
@@ -180,12 +181,12 @@ def main():
             while 1:
                 degy -= d_deg_y
                 _, y = lonlat_to_pixel(degy, lon1, zoom)
-                y -= y0
+                y -= y0 # from top of picture
                 if y <= dy:
                     continue
                 if y >= dy + tmph:
                     break
-                yp = (y - dy) / koeff
+                yp = (y - dy) / koeffy
                 d, m, s = deg2dms(degy)
                 if m == 0 and (s < 0.0001 or s > 59.9999):
                     c.setLineWidth(3)
@@ -199,7 +200,7 @@ def main():
                 c.line(xp1, yp2 - yp, xp2, yp2 - yp)
                 c.setFont(FONT, 5)
                 if opts.deg:
-                    text = "%.4f" % degy
+                    text = "%.4f" % (degy + 0.001) # wtf ???
                 else:
                     text = "%iº%0.2i'%0.2i\"" % (d, m, round(s))
                 c.saveState()
@@ -208,7 +209,7 @@ def main():
                 c.drawCentredString(0, 0, text)
                 c.restoreState()
                 c.saveState()
-                c.translate(xp2 + 5, yp2 - yp)
+                c.translate(xp2 + 10, yp2 - yp)
                 c.rotate(90)
                 c.drawCentredString(0, 0, text)
                 c.restoreState()
@@ -235,7 +236,7 @@ if __name__ == '__main__':
     parser.add_option("-z", "--zoom", dest="zoom",
                   help="zoom (10-18)", metavar="n", type="int", default="17")
     parser.add_option("--deg", dest="deg", action="store_true",
-                  help="use d.dddd instead of d mm' s.sss", default=False)
+                  help="use d.dddd instead of d mm' s.sss", default=True)
     parser.add_option("--pages_x", dest="numx", type="int",
                   help="fit in n pages with", default=2)
 #    parser.add_option("--pages_y", dest="numy", type="int",
