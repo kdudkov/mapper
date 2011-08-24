@@ -10,7 +10,7 @@ from reportlab.pdfbase import pdfmetrics, ttfonts
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.lib.pagesizes import A4, A3, landscape
 import Image
-from gmap import TILE_SIZE, lonlat_to_pixel, get_tile
+from gmap import TILE_SIZE, lonlat_to_pixel, get_tile, latlon2tile
 
 PEREKR = 0.8
 
@@ -65,9 +65,8 @@ def main():
     lon1, lon2 = min(c1[1], c2[1]), max(c1[1], c2[1])
 
     zoom = opts.zoom
-    x2tx = lambda x: int(x / TILE_SIZE)
-    tx1, ty1 = map(x2tx, lonlat_to_pixel(lat1, lon1, zoom))
-    tx2, ty2 = map(x2tx, lonlat_to_pixel(lat2, lon2, zoom))
+    tx1, ty1 = latlon2tile(lat1, lon1, zoom)
+    tx2, ty2 = latlon2tile(lat2, lon2, zoom)
 
     # size of map
     mapw, maph = (tx2 - tx1) * TILE_SIZE, (ty1 - ty2) * TILE_SIZE
@@ -200,7 +199,7 @@ def main():
                 c.line(xp1, yp2 - yp, xp2, yp2 - yp)
                 c.setFont(FONT, 5)
                 if opts.deg:
-                    text = "%.4f" % (degy + 0.001) # wtf ???
+                    text = "%.4f" % (degy) # + 0.001) # wtf ???
                 else:
                     text = "%iº%0.2i'%0.2i\"" % (d, m, round(s))
                 c.saveState()
@@ -234,7 +233,7 @@ if __name__ == '__main__':
     parser.add_option("--coords2", dest="c2",
                   help="upper top corner", metavar="lat2,lon2", default="60.33,29.38")
     parser.add_option("-z", "--zoom", dest="zoom",
-                  help="zoom (10-18)", metavar="n", type="int", default="17")
+                  help="zoom (10-18)", metavar="n", type="int", default=17)
     parser.add_option("--deg", dest="deg", action="store_true",
                   help="use d.dddd instead of d mm' s.sss", default=True)
     parser.add_option("--pages_x", dest="numx", type="int",
