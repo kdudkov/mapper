@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-from math import floor
 from optparse import OptionParser
 import ImageEnhance
 
@@ -121,10 +120,13 @@ def main():
         d_deg_y = i
     #print deg2dms(d_deg_x), deg2dms(d_deg_y)
     numpages = 0
-    dy = 0
+    xcc, ycc = lonlat_to_pixel(lat2, lon1, zoom)
+    xcc -= TILE_SIZE * tx1
+    ycc -= TILE_SIZE * ty2
+    dy = ycc
     py = 1
     while dy  + imgh * (1 - PEREKR) * 1.05 <= maph:
-        dx = 0
+        dx = xcc
         px = 1
         while dx + imgw * (1 - PEREKR) * 1.05 <= mapw:
             numpages += 1
@@ -146,7 +148,7 @@ def main():
             c.setStrokeAlpha(0.5)
             # draw x grid
             degx = int(lon1)
-            x0, _ = lonlat_to_pixel(lat1, lon1, zoom)
+            x0 = tx1 * TILE_SIZE
             while 1:
                 degx += d_deg_x
                 x, _ = lonlat_to_pixel(lat1, degx, zoom)
@@ -176,7 +178,7 @@ def main():
                 c.drawCentredString(xp + xp1, yp2 + 5, text)
             # draw y grid
             degy = int(lat2) + 1
-            _, y0 = lonlat_to_pixel(lat2, lon1, zoom)
+            y0 = ty2 * TILE_SIZE
             while 1:
                 degy -= d_deg_y
                 _, y = lonlat_to_pixel(degy, lon1, zoom)
@@ -199,7 +201,7 @@ def main():
                 c.line(xp1, yp2 - yp, xp2, yp2 - yp)
                 c.setFont(FONT, 5)
                 if opts.deg:
-                    text = "%.4f" % (degy) # + 0.001) # wtf ???
+                    text = "%.4f" % degy
                 else:
                     text = "%iº%0.2i'%0.2i\"" % (d, m, round(s))
                 c.saveState()
@@ -235,7 +237,7 @@ if __name__ == '__main__':
     parser.add_option("-z", "--zoom", dest="zoom",
                   help="zoom (10-18)", metavar="n", type="int", default=17)
     parser.add_option("--deg", dest="deg", action="store_true",
-                  help="use d.dddd instead of d mm' s.sss", default=True)
+                  help="use d.dddd instead of d mm' s.sss", default=False)
     parser.add_option("--pages_x", dest="numx", type="int",
                   help="fit in n pages with", default=2)
 #    parser.add_option("--pages_y", dest="numy", type="int",
