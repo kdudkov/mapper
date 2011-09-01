@@ -146,7 +146,10 @@ def main():
                 img1.paste(img11, (0, 0))
             else:
                 img1 = img11
-            c.drawInlineImage(img1, xp1, yp1, xp2 - xp1, yp2 - yp1)
+            pfname = "tmp.jpg"
+            img1.save(pfname, "JPEG")
+            c.drawImage(pfname, xp1, yp1, xp2 - xp1, yp2 - yp1)
+            #c.drawInlineImage(img1, xp1, yp1, xp2 - xp1, yp2 - yp1)
             c.setStrokeColorRGB(0.0, 0.0, 0.0)
             c.setLineWidth(1)
             c.rect(xp1, yp1, xp2 - xp1, yp2 - yp1)
