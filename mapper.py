@@ -10,6 +10,7 @@ from reportlab.pdfgen.canvas import Canvas
 from reportlab.lib.pagesizes import A4, A3, landscape
 import Image
 from gmap import TILE_SIZE, lonlat_to_pixel, get_tile, latlon2tile
+import gpslib
 
 PEREKR = 0.2
 
@@ -126,6 +127,8 @@ def main():
         if i * pdegy < 1 * cm:
             break
         d_deg_y = i
+    m_in_cm_x = gpslib.distance(gpslib.Point(lat1, lon1), gpslib.Point(lat1, lon1 + cm / pdegx))[0]
+    m_in_cm_y = gpslib.distance(gpslib.Point(lat1, lon1), gpslib.Point(lat1 + cm / pdegy, lon1))[0]
 
     # splitting map to pdf pages
     numpages = 0
@@ -137,7 +140,7 @@ def main():
         while dx + (1 - PEREKR) * imgw <= xcc2:
             numpages += 1
             c.setFont(FONT, 10)
-            c.drawString(page_border, maxy - page_border - 10, '%s, page %s-%s' % (opts.title, px, py))
+            c.drawString(page_border, maxy - page_border - 10, '%s, page %s-%s (1см = %iм)' % (opts.title, px, py, round(m_in_cm_x)))
             tmpw, tmph = min(imgw, mapbw - dx), min(imgh, mapbh - dy)
             img11 = map_img.crop((dx, dy, dx + tmpw, dy + tmph))
             img11.load()
@@ -146,7 +149,7 @@ def main():
                 img1.paste(img11, (0, 0))
             else:
                 img1 = img11
-            pfname = "tmp.jpg"
+            pfname = "tmp-%s-%s.jpg" % (px, py)
             img1.save(pfname, "JPEG")
             c.drawImage(pfname, xp1, yp1, xp2 - xp1, yp2 - yp1)
             #c.drawInlineImage(img1, xp1, yp1, xp2 - xp1, yp2 - yp1)
