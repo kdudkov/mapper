@@ -11,7 +11,7 @@ from reportlab.lib.pagesizes import A4, A3, landscape
 import Image
 from gmap import TILE_SIZE, lonlat_to_pixel, get_tile, latlon2tile
 
-PEREKR = 0.8
+PEREKR = 0.2
 
 __author__ = 'madrider'
 
@@ -64,13 +64,21 @@ def main():
     lon1, lon2 = min(c1[1], c2[1]), max(c1[1], c2[1])
 
     zoom = opts.zoom
-    tx1, ty1 = latlon2tile(lat1, lon1, zoom)
-    tx2, ty2 = latlon2tile(lat2, lon2, zoom)
 
     # size of map
-    mapw, maph = (tx2 - tx1) * TILE_SIZE, (ty1 - ty2) * TILE_SIZE
-    print "got %i x %i map" % (mapw, maph)
+    tx1, ty1 = latlon2tile(lat1, lon1, zoom) # num of tiles
+    tx2, ty2 = latlon2tile(lat2, lon2, zoom)
+    xcc, ycc = lonlat_to_pixel(lat2, lon1, zoom)
+    xcc2, ycc2 = lonlat_to_pixel(lat1, lon2, zoom)
+    xcc -= TILE_SIZE * tx1
+    ycc -= TILE_SIZE * ty2
+    xcc2 -= TILE_SIZE * tx1
+    ycc2 -= TILE_SIZE * ty2
+    mapbw, mapbh = (tx2 - tx1 + 1) * TILE_SIZE, (ty1 - ty2 + 1) * TILE_SIZE
+    mapw, maph = xcc2 - xcc, ycc2 - ycc
+    print "got %i x %i map" % (mapbw, mapbh)
 
+    # page size
     c = Canvas(opts.filename, pagesize=page_size)
     maxx, maxy = page_size
     page_border = 1 * cm
@@ -78,13 +86,13 @@ def main():
     xp2, yp2 = maxx - page_border, maxy - page_border
     yp2 -= 10 + 30 # for page title
 
-    imgw = int(mapw / (1 + (opts.numx - 1) * PEREKR))
+    imgw = int(mapw / (1. + (opts.numx - 1) * (1. - PEREKR)))
     imgh = int((yp2 - yp1) / (xp2 - xp1) * imgw)
     print "need %i x %i image for 1 page" % (imgw, imgh)
 
     # glue tiles to big picture
-    map_img = Image.new("RGBA", ((tx2 - tx1) * TILE_SIZE, (ty1 - ty2) * TILE_SIZE), (200, 200, 200))
-    for ty in range(ty2, ty1):
+    map_img = Image.new("RGBA", ((tx2 - tx1 + 1) * TILE_SIZE, (ty1 - ty2 + 1) * TILE_SIZE), (200, 200, 200))
+    for ty in range(ty2, ty1 + 1):
         for tx in range(tx1, tx2 + 1):
             fname = get_tile(tx, ty, zoom)
             #print fname
@@ -118,21 +126,19 @@ def main():
         if i * pdegy < 1 * cm:
             break
         d_deg_y = i
-    #print deg2dms(d_deg_x), deg2dms(d_deg_y)
+
+    # splitting map to pdf pages
     numpages = 0
-    xcc, ycc = lonlat_to_pixel(lat2, lon1, zoom)
-    xcc -= TILE_SIZE * tx1
-    ycc -= TILE_SIZE * ty2
     dy = ycc
     py = 1
-    while dy  + imgh * (1 - PEREKR) * 1.05 <= maph:
+    while dy + (1 - PEREKR) * imgh <= ycc2:
         dx = xcc
         px = 1
-        while dx + imgw * (1 - PEREKR) * 1.05 <= mapw:
+        while dx + (1 - PEREKR) * imgw <= xcc2:
             numpages += 1
             c.setFont(FONT, 10)
             c.drawString(page_border, maxy - page_border - 10, '%s, page %s-%s' % (opts.title, px, py))
-            tmpw, tmph = min(imgw, mapw - dx), min(imgh, maph - dy)
+            tmpw, tmph = min(imgw, mapbw - dx), min(imgh, mapbh - dy)
             img11 = map_img.crop((dx, dy, dx + tmpw, dy + tmph))
             img11.load()
             if tmpw < imgw or tmph < imgh:
@@ -215,9 +221,9 @@ def main():
                 c.drawCentredString(0, 0, text)
                 c.restoreState()
             c.showPage()
-            dx += int(imgw * PEREKR)
+            dx += int(imgw * (1. - PEREKR))
             px += 1
-        dy += int(imgh * PEREKR)
+        dy += int(imgh * (1. - PEREKR))
         py += 1
     c.save()
     print "%s pages in pdf" % numpages
