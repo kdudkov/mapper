@@ -31,7 +31,7 @@ class Point(object):
     elev = 0.0
     name = None
 
-    def __init__(self, lat, lon, elev=0, name=None):
+    def __init__(self, lon, lat, elev=0, name=None):
         self.lat = float(lat)
         self.lon = float(lon)
         self.elev = elev

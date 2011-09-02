@@ -8,7 +8,7 @@ from reportlab.lib.units import cm, mm, inch
 from reportlab.pdfbase import pdfmetrics, ttfonts
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.lib.pagesizes import A4, A3, landscape
-import Image
+import Image, ImageDraw
 from gmap import TILE_SIZE, lonlat_to_pixel, get_tile, lonlat2tile
 import gpslib
 
@@ -59,9 +59,9 @@ class Map(object):
         self.xp2 -= self.tx1 * TILE_SIZE
         self.yp2 -= self.ty1 * TILE_SIZE
         self.mapsize = P(self.xp2 - self.xp1, self.yp2 - self.yp1)
-        self.fullsize = P((self.tx2 - self.tx1) * TILE_SIZE, (self.ty2 - self.ty1) * TILE_SIZE)
-        print self.fullsize
-        
+        self.fullsize = P((self.tx2 - self.tx1 + 1) * TILE_SIZE, (self.ty2 - self.ty1 + 1) * TILE_SIZE)
+
+
     def get_map(self, save=True):
         self.map_img = Image.new("RGBA", (self.fullsize.x, self.fullsize.y), (200, 200, 200))
         for ty in range(self.ty1, self.ty2 + 1):
@@ -74,8 +74,32 @@ class Map(object):
                 xp, yp = TILE_SIZE * (tx - self.tx1), TILE_SIZE * (ty - self.ty1)
                 self.map_img.paste(img1, (xp, yp))
         self.enhance(contrast=opts.contrast, brightness=opts.bright)
+
+        mx = gpslib.distance(gpslib.Point(self.lon1, self.lat1), gpslib.Point(self.lon2, self.lat1))[0]
+        my = gpslib.distance(gpslib.Point(self.lon1, self.lat1), gpslib.Point(self.lon1, self.lat2))[0]
+        desty = int(my * self.fullsize.x / mx)
+        self.y_koeff = float(desty) / float(self.fullsize.y)
+        self.map_img1 = self.map_img.resize((self.fullsize.x, desty), Image.BILINEAR)
+        self.fullsize.y = desty
+        self.map_img = self.map_img1
+        self.m_per_pix = mx / self.mapsize.x
+        self.m_per_pix_y =  my / self.mapsize.y
+
+        points = []
+        for s in open('points.txt', 'r'):
+            s = s.strip()
+            if s:
+                lon, lat = s.split(',')
+                points.append(self.lonlat2xy(float(lon), float(lat)))
+        if points:
+            points.append(points[0])
+            draw = ImageDraw.Draw(self.map_img)
+            draw.line(points)
+
         if save:
             self.map_img.save("map.jpg", "JPEG")
+            self.map_img1.save("map1.jpg", "JPEG")
+
 
     def enhance(self, brightness=1.0, contrast=1.0, saturation=1.0, sharpness=1.0):
         if brightness != 1.0:
@@ -91,6 +115,7 @@ class Map(object):
         x, y = lonlat_to_pixel(lon, lat, self.zoom)
         x -= self.tx1 * TILE_SIZE
         y -= self.ty1 * TILE_SIZE
+        y = y * self.y_koeff
         return x, y
 
 def main():
@@ -115,7 +140,8 @@ def main():
     lon1, lon2 = min(c1[1], c2[1]), max(c1[1], c2[1])
     zoom = opts.zoom
     map_ = Map(lon1, lat1, lon2, lat2, zoom)
-
+    map_.get_map()
+    
     print "got %i x %i map" % (map_.fullsize.x, map_.fullsize.y)
 
     # page size
@@ -126,11 +152,15 @@ def main():
     xp2, yp2 = maxx - page_border, maxy - page_border
     yp2 -= 10 + 30 # for page title
 
-    imgw = int(map_.mapsize.x / (1. + (opts.numx - 1) * (1. - PEREKR)))
+    if 0:
+        imgw = int(map_.mapsize.x / (1. + (opts.numx - 1) * (1. - PEREKR)))
+    else:
+        format_ = 10 # meters per cm
+        m1 = (xp2 - xp1) / cm * format_
+        imgw = int(m1 / map_.m_per_pix)
     imgh = int((yp2 - yp1) / (xp2 - xp1) * imgw)
     print "need %i x %i image for 1 page" % (imgw, imgh)
 
-    map_.get_map()
 
     koeffx = float(imgw) / (xp2 - xp1)
     koeffy = float(imgh) / (yp2 - yp1)
@@ -155,9 +185,10 @@ def main():
         if i * pdegy < 1 * cm:
             break
         d_deg_y = i
-    m_in_cm_x = gpslib.distance(gpslib.Point(lat1, lon1), gpslib.Point(lat1, lon1 + cm / pdegx))[0]
-    m_in_cm_y = gpslib.distance(gpslib.Point(lat1, lon1), gpslib.Point(lat1 + cm / pdegy, lon1))[0]
-
+    m_in_cm_x = gpslib.distance(gpslib.Point(lon1, lat1), gpslib.Point(lon1 + cm / pdegx, lat1))[0]
+    m_in_cm_y = gpslib.distance(gpslib.Point(lon1, lat1), gpslib.Point(lon1, lat1 + cm / pdegy))[0]
+    print m_in_cm_x, m_in_cm_y
+    
     # splitting map to pdf pages
     numpages = 0
     dy = map_.yp1

@@ -4,3 +4,5 @@
 *.pdf
 *.jpg
 cache
+points.txt
+*.kml
