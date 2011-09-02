@@ -8,7 +8,7 @@ import urllib
 
 TILE_SIZE = 256
 
-def lonlat_to_pixel(lat, lon, zoom):
+def lonlat_to_pixel(lon, lat, zoom):
     """Перевод из географических координат в координаты на полной карте"""
     num = pow(2., zoom) # число тайлов
     numpix = TILE_SIZE * num # пикселей на карте
@@ -19,9 +19,9 @@ def lonlat_to_pixel(lat, lon, zoom):
     y = int(numpix - y0 * numpix / cm)
     return x, y
 
-def latlon2tile(lat, lon, zoom):
+def lonlat2tile(lon, lat, zoom):
     """Перевод из географических координат в номер тайла, содержащего точку"""
-    gx, gy = lonlat_to_pixel(lat, lon, zoom)
+    gx, gy = lonlat_to_pixel(lon, lat, zoom)
     n = int(gx / TILE_SIZE)
     m = int(gy / TILE_SIZE)
     return n, m
@@ -35,7 +35,7 @@ def pixel_to_lonlat(gx, gy, zoom):
     cm = math.pi * 2
     y1 = (numpix - gy) * cm / numpix - cm / 2
     lat = math.degrees(math.atan(math.sinh(y1)))
-    return lat, lon
+    return lon, lat
     
 def get_tile(tx, ty, zoom):
     fname = os.path.join('cache', str(zoom), '%i_%i.jpg' % (tx, ty))

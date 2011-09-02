@@ -9,7 +9,7 @@ from reportlab.pdfbase import pdfmetrics, ttfonts
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.lib.pagesizes import A4, A3, landscape
 import Image
-from gmap import TILE_SIZE, lonlat_to_pixel, get_tile, latlon2tile
+from gmap import TILE_SIZE, lonlat_to_pixel, get_tile, lonlat2tile
 import gpslib
 
 PEREKR = 0.2
@@ -32,16 +32,66 @@ def deg2dms(deg):
 def dms2deg(d, m, s):
     return d + m / 60. + s / 3600.
 
-def enhance(im, brightness=1.0, contrast=1.0, saturation=1.0, sharpness=1.0):
-    if brightness != 1.0:
-        im = ImageEnhance.Brightness(im).enhance(brightness)
-    elif contrast != 1.0:
-        im = ImageEnhance.Contrast(im).enhance(contrast)
-    if saturation != 1.0:
-        im = ImageEnhance.Color(im).enhance(saturation)
-    if sharpness != 1.0:
-        im = ImageEnhance.Sharpness(im).enhance(sharpness)
-    return im
+class P(object):
+    x = 0
+    y = 0
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __str__(self):
+        return "%i x %i" % (self.x, self.y)
+    
+class Map(object):
+    def __init__(self, lon1, lat1, lon2, lat2, zoom):
+        self.lat1 = max(lat1, lat2)
+        self.lon1 = min(lon1, lon2)
+        self.lat2 = min(lat1, lat2)
+        self.lon2 = max(lon1, lon2)
+        self.zoom = zoom
+        self.tx1, self.ty1 = lonlat2tile(self.lon1, self.lat1, zoom) # num of tiles
+        self.tx2, self.ty2 = lonlat2tile(self.lon2, self.lat2, zoom)
+        self.xp1, self.yp1 = lonlat_to_pixel(self.lon1, self.lat1, zoom)
+        self.xp1 -= self.tx1 * TILE_SIZE
+        self.yp1 -= self.ty1 * TILE_SIZE
+        self.xp2, self.yp2 = lonlat_to_pixel(self.lon2, self.lat2, zoom)
+        self.xp2 -= self.tx1 * TILE_SIZE
+        self.yp2 -= self.ty1 * TILE_SIZE
+        self.mapsize = P(self.xp2 - self.xp1, self.yp2 - self.yp1)
+        self.fullsize = P((self.tx2 - self.tx1) * TILE_SIZE, (self.ty2 - self.ty1) * TILE_SIZE)
+        print self.fullsize
+        
+    def get_map(self, save=True):
+        self.map_img = Image.new("RGBA", (self.fullsize.x, self.fullsize.y), (200, 200, 200))
+        for ty in range(self.ty1, self.ty2 + 1):
+            for tx in range(self.tx1, self.tx2 + 1):
+                fname = get_tile(tx, ty, self.zoom)
+                try:
+                    img1 = Image.open(fname)
+                except:
+                    img1 = Image.new("RGBA", (256, 256), (200, 255, 200))
+                xp, yp = TILE_SIZE * (tx - self.tx1), TILE_SIZE * (ty - self.ty1)
+                self.map_img.paste(img1, (xp, yp))
+        self.enhance(contrast=opts.contrast, brightness=opts.bright)
+        if save:
+            self.map_img.save("map.jpg", "JPEG")
+
+    def enhance(self, brightness=1.0, contrast=1.0, saturation=1.0, sharpness=1.0):
+        if brightness != 1.0:
+            self.map_img = ImageEnhance.Brightness(self.map_img).enhance(brightness)
+        elif contrast != 1.0:
+            self.map_img = ImageEnhance.Contrast(self.map_img).enhance(contrast)
+        if saturation != 1.0:
+            self.map_img = ImageEnhance.Color(self.map_img).enhance(saturation)
+        if sharpness != 1.0:
+            self.map_img = ImageEnhance.Sharpness(self.map_img).enhance(sharpness)
+
+    def lonlat2xy(self, lon, lat):
+        x, y = lonlat_to_pixel(lon, lat, self.zoom)
+        x -= self.tx1 * TILE_SIZE
+        y -= self.ty1 * TILE_SIZE
+        return x, y
 
 def main():
     DMS_GRID = (dms2deg(0, 30, 0), dms2deg(0, 10, 0), dms2deg(0, 1, 0), dms2deg(0, 0, 30), dms2deg(0, 0, 10), dms2deg(0, 0, 5), dms2deg(0, 0, 2), dms2deg(0, 0, 1))
@@ -61,23 +111,12 @@ def main():
         print "smth wrong in command line!"
         return 1
 
-    lat1, lat2 = min(c1[0], c2[0]), max(c1[0], c2[0])
+    lat1, lat2 = max(c1[0], c2[0]), min(c1[0], c2[0])
     lon1, lon2 = min(c1[1], c2[1]), max(c1[1], c2[1])
-
     zoom = opts.zoom
+    map_ = Map(lon1, lat1, lon2, lat2, zoom)
 
-    # size of map
-    tx1, ty1 = latlon2tile(lat1, lon1, zoom) # num of tiles
-    tx2, ty2 = latlon2tile(lat2, lon2, zoom)
-    xcc, ycc = lonlat_to_pixel(lat2, lon1, zoom)
-    xcc2, ycc2 = lonlat_to_pixel(lat1, lon2, zoom)
-    xcc -= TILE_SIZE * tx1
-    ycc -= TILE_SIZE * ty2
-    xcc2 -= TILE_SIZE * tx1
-    ycc2 -= TILE_SIZE * ty2
-    mapbw, mapbh = (tx2 - tx1 + 1) * TILE_SIZE, (ty1 - ty2 + 1) * TILE_SIZE
-    mapw, maph = xcc2 - xcc, ycc2 - ycc
-    print "got %i x %i map" % (mapbw, mapbh)
+    print "got %i x %i map" % (map_.fullsize.x, map_.fullsize.y)
 
     # page size
     c = Canvas(opts.filename, pagesize=page_size)
@@ -87,28 +126,17 @@ def main():
     xp2, yp2 = maxx - page_border, maxy - page_border
     yp2 -= 10 + 30 # for page title
 
-    imgw = int(mapw / (1. + (opts.numx - 1) * (1. - PEREKR)))
+    imgw = int(map_.mapsize.x / (1. + (opts.numx - 1) * (1. - PEREKR)))
     imgh = int((yp2 - yp1) / (xp2 - xp1) * imgw)
     print "need %i x %i image for 1 page" % (imgw, imgh)
 
-    # glue tiles to big picture
-    map_img = Image.new("RGBA", ((tx2 - tx1 + 1) * TILE_SIZE, (ty1 - ty2 + 1) * TILE_SIZE), (200, 200, 200))
-    for ty in range(ty2, ty1 + 1):
-        for tx in range(tx1, tx2 + 1):
-            fname = get_tile(tx, ty, zoom)
-            #print fname
-            try:
-                img1 = Image.open(fname)
-            except:
-                img1 = Image.new("RGBA", (256, 256), (200, 255, 200))
-            xp, yp = TILE_SIZE * (tx - tx1), TILE_SIZE * (ty - min(ty1, ty2))
-            map_img.paste(img1, (xp, yp))
-    map_img = enhance(map_img, contrast=opts.contrast, brightness=opts.bright)
-    map_img.save("map.jpg", "JPEG")
+    map_.get_map()
+
     koeffx = float(imgw) / (xp2 - xp1)
     koeffy = float(imgh) / (yp2 - yp1)
+
     # pixels in deg of x axis (lon)
-    pdegx = lonlat_to_pixel(lat1, lon1 + 1, zoom)[0] - lonlat_to_pixel(lat1, lon1, zoom)[0]
+    pdegx = lonlat_to_pixel(lon1 + 1, lat1, zoom)[0] - lonlat_to_pixel(lon1, lat1, zoom)[0]
     pdegx /= koeffx # to pdf pixels
     if opts.deg:
         grid = D_GRID
@@ -120,7 +148,7 @@ def main():
             break
         d_deg_x = i
     # pixels in deg of y axis (lat)
-    pdegy = abs(lonlat_to_pixel(lat1 + 1, lon1, zoom)[1] - lonlat_to_pixel(lat1, lon1, zoom)[1])
+    pdegy = abs(lonlat_to_pixel(lon1, lat1 + 1, zoom)[1] - lonlat_to_pixel(lon1, lat1, zoom)[1])
     pdegy /= koeffy # to pdf pixels
     d_deg_y = 1
     for i in grid:
@@ -132,17 +160,17 @@ def main():
 
     # splitting map to pdf pages
     numpages = 0
-    dy = ycc
+    dy = map_.yp1
     py = 1
-    while dy + (1 - PEREKR) * imgh <= ycc2:
-        dx = xcc
+    while dy + (1 - PEREKR) * imgh <= map_.yp2:
+        dx = map_.xp1
         px = 1
-        while dx + (1 - PEREKR) * imgw <= xcc2:
+        while dx + (1 - PEREKR) * imgw <= map_.xp2:
             numpages += 1
             c.setFont(FONT, 10)
-            c.drawString(page_border, maxy - page_border - 10, '%s, page %s-%s (1см = %iм)' % (opts.title, px, py, round(m_in_cm_x)))
-            tmpw, tmph = min(imgw, mapbw - dx), min(imgh, mapbh - dy)
-            img11 = map_img.crop((dx, dy, dx + tmpw, dy + tmph))
+            c.drawString(xp1, maxy - page_border - 10, '%s, page %s-%s (1см = %iм)' % (opts.title, px, py, round(m_in_cm_x)))
+            tmpw, tmph = min(imgw, map_.xp2 - dx), min(imgh, map_.yp2 - dy)
+            img11 = map_.map_img.crop((dx, dy, dx + tmpw, dy + tmph))
             img11.load()
             if tmpw < imgw or tmph < imgh:
                 img1 = Image.new("RGBA", (imgw, imgh), (250, 250, 250))
@@ -160,11 +188,9 @@ def main():
             c.setStrokeAlpha(0.5)
             # draw x grid
             degx = int(lon1)
-            x0 = tx1 * TILE_SIZE
             while 1:
                 degx += d_deg_x
-                x, _ = lonlat_to_pixel(lat1, degx, zoom)
-                x -= x0
+                x, _ = map_.lonlat2xy(degx, lat1)
                 if x <= dx:
                     continue
                 if x >= dx + tmpw:
@@ -189,12 +215,10 @@ def main():
                 c.drawCentredString(xp + xp1, yp1 - 5, text)
                 c.drawCentredString(xp + xp1, yp2 + 5, text)
             # draw y grid
-            degy = int(lat2) + 1
-            y0 = ty2 * TILE_SIZE
+            degy = int(lat1) + 1
             while 1:
                 degy -= d_deg_y
-                _, y = lonlat_to_pixel(degy, lon1, zoom)
-                y -= y0 # from top of picture
+                _, y = map_.lonlat2xy(lon1, degy)
                 if y <= dy:
                     continue
                 if y >= dy + tmph:
