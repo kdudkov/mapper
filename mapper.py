@@ -152,15 +152,13 @@ def main():
     xp2, yp2 = maxx - page_border, maxy - page_border
     yp2 -= 10 + 30 # for page title
 
-    if 0:
-        imgw = int(map_.mapsize.x / (1. + (opts.numx - 1) * (1. - PEREKR)))
-    else:
-        format_ = 10 # meters per cm
-        m1 = (xp2 - xp1) / cm * format_
+    if opts.scale:
+        m1 = (xp2 - xp1) / cm * opts.scale
         imgw = int(m1 / map_.m_per_pix)
+    else:
+        imgw = int(map_.mapsize.x / (1. + (opts.numx - 1) * (1. - PEREKR)))
     imgh = int((yp2 - yp1) / (xp2 - xp1) * imgw)
     print "need %i x %i image for 1 page" % (imgw, imgh)
-
 
     koeffx = float(imgw) / (xp2 - xp1)
     koeffy = float(imgh) / (yp2 - yp1)
@@ -200,6 +198,7 @@ def main():
             numpages += 1
             c.setFont(FONT, 10)
             c.drawString(xp1, maxy - page_border - 10, '%s, page %s-%s (1см = %iм)' % (opts.title, px, py, round(m_in_cm_x)))
+            c.line(xp2 - cm, maxy - page_border - 5, xp2, maxy - page_border - 5)
             tmpw, tmph = min(imgw, map_.xp2 - dx), min(imgh, map_.yp2 - dy)
             img11 = map_.map_img.crop((dx, dy, dx + tmpw, dy + tmph))
             img11.load()
@@ -305,6 +304,8 @@ if __name__ == '__main__':
                   help="zoom (10-18)", metavar="n", type="int", default=17)
     parser.add_option("--deg", dest="deg", action="store_true",
                   help="use d.dddd instead of d mm' s.sss", default=False)
+    parser.add_option("--scale", dest="scale", type="int",
+                  help="scale in meters in cm", default=0)
     parser.add_option("--pages_x", dest="numx", type="int",
                   help="fit in n pages with", default=2)
 #    parser.add_option("--pages_y", dest="numy", type="int",
