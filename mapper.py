@@ -44,6 +44,8 @@ class P(object):
         return "%i x %i" % (self.x, self.y)
     
 class Map(object):
+    correction = 0
+
     def __init__(self, lon1, lat1, lon2, lat2, zoom):
         self.lat1 = max(lat1, lat2)
         self.lon1 = min(lon1, lon2)
@@ -74,14 +76,14 @@ class Map(object):
                 xp, yp = TILE_SIZE * (tx - self.tx1), TILE_SIZE * (ty - self.ty1)
                 self.map_img.paste(img1, (xp, yp))
         self.enhance(contrast=opts.contrast, brightness=opts.bright)
-
         mx = gpslib.distance(gpslib.Point(self.lon1, self.lat1), gpslib.Point(self.lon2, self.lat1))[0]
         my = gpslib.distance(gpslib.Point(self.lon1, self.lat1), gpslib.Point(self.lon1, self.lat2))[0]
-        desty = int(my * self.fullsize.x / mx)
-        self.y_koeff = float(desty) / float(self.fullsize.y)
-        self.map_img1 = self.map_img.resize((self.fullsize.x, desty), Image.BILINEAR)
-        self.fullsize.y = desty
-        self.map_img = self.map_img1
+        if self.correction:
+            desty = int(my * self.fullsize.x / mx)
+            self.y_koeff = float(desty) / float(self.fullsize.y)
+            self.map_img1 = self.map_img.resize((self.fullsize.x, desty), Image.BILINEAR)
+            self.fullsize.y = desty
+            self.map_img = self.map_img1
         self.m_per_pix = mx / self.mapsize.x
         self.m_per_pix_y =  my / self.mapsize.y
 
@@ -98,8 +100,6 @@ class Map(object):
 
         if save:
             self.map_img.save("map.jpg", "JPEG")
-            self.map_img1.save("map1.jpg", "JPEG")
-
 
     def enhance(self, brightness=1.0, contrast=1.0, saturation=1.0, sharpness=1.0):
         if brightness != 1.0:
@@ -115,7 +115,8 @@ class Map(object):
         x, y = lonlat_to_pixel(lon, lat, self.zoom)
         x -= self.tx1 * TILE_SIZE
         y -= self.ty1 * TILE_SIZE
-        y = y * self.y_koeff
+        if self.correction:
+            y = y * self.y_koeff
         return x, y
 
 def main():
@@ -164,7 +165,7 @@ def main():
     koeffy = float(imgh) / (yp2 - yp1)
 
     # pixels in deg of x axis (lon)
-    pdegx = lonlat_to_pixel(lon1 + 1, lat1, zoom)[0] - lonlat_to_pixel(lon1, lat1, zoom)[0]
+    pdegx = map_.lonlat2xy(lon1 + 1, lat1)[0] - map_.lonlat2xy(lon1, lat1)[0]
     pdegx /= koeffx # to pdf pixels
     if opts.deg:
         grid = D_GRID
@@ -176,7 +177,7 @@ def main():
             break
         d_deg_x = i
     # pixels in deg of y axis (lat)
-    pdegy = abs(lonlat_to_pixel(lon1, lat1 + 1, zoom)[1] - lonlat_to_pixel(lon1, lat1, zoom)[1])
+    pdegy = abs(map_.lonlat2xy(lon1, lat1 + 1)[1] - map_.lonlat2xy(lon1, lat1)[1])
     pdegy /= koeffy # to pdf pixels
     d_deg_y = 1
     for i in grid:
