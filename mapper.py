@@ -11,6 +11,7 @@ from reportlab.lib.pagesizes import A4, A3, landscape
 import Image, ImageDraw
 from gmap import TILE_SIZE, lonlat_to_pixel, get_tile, lonlat2tile
 import gpslib
+import kmlr
 
 PEREKR = 0.2
 
@@ -87,16 +88,15 @@ class Map(object):
         self.m_per_pix = mx / self.mapsize.x
         self.m_per_pix_y =  my / self.mapsize.y
 
-        points = []
-        for s in open('points.txt', 'r'):
-            s = s.strip()
-            if s:
-                lon, lat = s.split(',')
-                points.append(self.lonlat2xy(float(lon), float(lat)))
-        if points:
-            points.append(points[0])
+        if opts.kml:
+            res = kmlr.process(opts.kml)
             draw = ImageDraw.Draw(self.map_img)
-            draw.line(points)
+
+            for l in res['lines']:
+                points = []
+                for p in l['coords']:
+                    points.append(self.lonlat2xy(p[0], p[1]))
+                draw.line(points)
 
         if save:
             self.map_img.save("map.jpg", "JPEG")
@@ -315,6 +315,8 @@ if __name__ == '__main__':
                   help="landscape page orientation", default=False)
     parser.add_option("--contrast", dest="contrast", type="float", default=1.5)
     parser.add_option("--bright", dest="bright", type="float", default=1.5)
+    parser.add_option("-k", "--kml", dest="kml", metavar="FILE",
+                  help="kml file", default='')
     opts, args = parser.parse_args()
 
     main()
