@@ -45,6 +45,10 @@ def get_tile(tx, ty, zoom):
         url = "http://khm1.google.com/kh/v=89&x=%i&s=&y=%i&z=%s&s=" % (tx, ty, zoom)
         print "getting %i x %i" % (tx, ty)
         urllib.urlretrieve(url, fname)
+    a = os.stat(fname)
+    if a.st_size < 2000:
+        print "invalid file?"
+        os.unlink(fname)
     return fname
 
 if __name__ == '__main__':

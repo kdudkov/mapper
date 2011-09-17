@@ -1,14 +1,17 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+import os
+import glob
 from optparse import OptionParser
-import ImageEnhance
+
+import Image, ImageDraw, ImageEnhance
 
 from reportlab.lib.units import cm, mm, inch
 from reportlab.pdfbase import pdfmetrics, ttfonts
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.lib.pagesizes import A4, A3, landscape
-import Image, ImageDraw
+
 from gmap import TILE_SIZE, lonlat_to_pixel, get_tile, lonlat2tile
 import gpslib
 import kmlr
@@ -320,5 +323,15 @@ if __name__ == '__main__':
                   help="kml file", default='')
     opts, args = parser.parse_args()
 
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print "interrupted"
+    except Exception, ex:
+        print ex
+    finally:
+        print "deleting temp files"
+        for s in glob.glob('tmp*.jpg'):
+            os.unlink(s)
+
   
