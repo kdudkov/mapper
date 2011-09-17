@@ -153,6 +153,7 @@ def main():
     xp2, yp2 = maxx - page_border, maxy - page_border
     yp2 -= 10 + 30 # for page title
 
+
     if opts.scale:
         m1 = (xp2 - xp1) / cm * opts.scale
         imgw = int(m1 / map_.m_per_pix)
@@ -186,7 +187,7 @@ def main():
         d_deg_y = i
     m_in_cm_x = gpslib.distance(gpslib.Point(lon1, lat1), gpslib.Point(lon1 + cm / pdegx, lat1))[0]
     m_in_cm_y = gpslib.distance(gpslib.Point(lon1, lat1), gpslib.Point(lon1, lat1 + cm / pdegy))[0]
-    print m_in_cm_x, m_in_cm_y
+#    print m_in_cm_x, m_in_cm_y
     
     # splitting map to pdf pages
     numpages = 0

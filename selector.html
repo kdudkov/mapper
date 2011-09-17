@@ -1,0 +1,111 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <title></title>
+    <style>
+        html { height: 100% }
+        body { height: 100%; margin: 0; padding: 0; }
+
+        * {
+            font-family: Verdana, Arial, sans-serif;
+            font-size: 10pt;
+        }
+
+        #map_canvas {
+            width: 50%;
+            height: 100%;
+            float:left;
+        }
+
+        #right {
+            width: 50%;
+            float: right;
+        }
+    </style>
+    <script type="text/javascript" src="http://yandex.st/jquery/1.6.3/jquery.min.js"></script>
+    <script type="text/javascript" src="http://maps.googleapis.com/maps/api/js?sensor=false&libraries=geometry"></script>
+
+    <script type="text/javascript">
+        var lt = new google.maps.LatLng(60.2696,30.4075);
+        var infowindow = new google.maps.InfoWindow();
+        var map;
+        var linesArray = []
+
+      function initialize() {
+        var latlng = new google.maps.LatLng(60.2696,30.4075);
+        var myOptions = {
+          zoom: 15,
+          center: latlng,
+          mapTypeId: google.maps.MapTypeId.SATELLITE,
+        };
+        map = new google.maps.Map($("#map_canvas")[0], myOptions);
+        google.maps.event.addListener(map, 'click', function(event) {
+            lt = event.latLng;
+            redraw();
+        });
+      }
+
+      function rnd(x) {
+          var k = Math.pow(10, 5)
+          return Math.round(x * k) / k;
+      }
+
+      function ll(lon, lat) {
+          return new google.maps.LatLng(lat, lon);
+      }
+
+      function redraw() {
+          linesArray.forEach(function(l) {l.setMap(null); delete(l); });
+          if (lt != null) {
+            var w = 538.582677165;
+            var h = 745.196850394;
+            var cm = 28.3464566929;
+            var perekr = 0.2;
+            var scale = $('#scale')[0].value;
+            var m2d_x = google.maps.geometry.spherical.computeDistanceBetween(lt, ll(lt.lng() + 1, lt.lat()));
+            var m2d_y = google.maps.geometry.spherical.computeDistanceBetween(lt, ll(lt.lng(), lt.lat() - 1));
+
+              function plusm(l, dx, dy) {
+                return ll(l.lng() + dx / m2d_x, l.lat() - dy / m2d_y)
+            }
+            var w_m = w / cm * scale / 100;
+            var h_m = h / cm * scale / 100;
+
+            for(iy=0; iy < $('#pages_y')[0].value; iy++) {
+                for(ix=0; ix < $('#pages_x')[0].value; ix++) {
+                    var lt1 = plusm(lt, ix * w_m * (1 - perekr), iy * h_m * (1 - perekr));
+                    var points = [
+                    lt1, plusm(lt1, w_m, 0), plusm(lt1, w_m, h_m), plusm(lt1, 0, h_m), lt1 ];
+                      var p1 = new google.maps.Polyline({
+                        path: points,
+                        strokeColor: "#FF0000",
+                        strokeOpacity: 1.0,
+                        strokeWeight: 2
+                      });
+
+                      p1.setMap(map);
+                      linesArray.push(p1);
+                }
+
+            }
+            var l2 = plusm(lt, ($('#pages_x')[0].value - 1) * (1 - perekr) * w_m + w_m, ($('#pages_y')[0].value - 1) * (1 - perekr) * h_m + h_m)
+            $('#result').text('--coords1=' + rnd(lt.lat()) + ',' + rnd(lt.lng()) + ' --coords2=' + rnd(l2.lat()) + ',' + rnd(l2.lng()) + ' --scale=' + scale / 100);
+          }
+      }
+
+    </script>
+</head>
+<body onload="initialize();">
+    <div id="map_canvas"></div>
+    <div id="right"><h1>Подготовка для печати карты</h1>
+    <form>
+        <table>
+        <tr><td><label for="pages_x">Страниц по x</label></td><td><input onchange="redraw()" size="15" id="pages_x" name="pages_x" value="3"/></td></tr>
+        <tr><td><label for="pages_y">Страниц по y</label></td><td><input onchange="redraw()" size="15" id="pages_y" name="pages_y" value="1"/></td></tr>
+        <tr><td><label for="scale">масштаб 1:</label></td><td><input onchange="redraw()" size="15" id="scale" name="scale" value="1000"/></td></tr>
+        </table>
+    </form>
+        <span id="result"></span>
+    </div>
+</body>
+</html>
