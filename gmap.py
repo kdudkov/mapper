@@ -1,4 +1,5 @@
 # coding: utf-8
+import random
 
 __author__ = 'madrider'
 
@@ -38,11 +39,16 @@ def pixel_to_lonlat(gx, gy, zoom):
     return lon, lat
     
 def get_tile(tx, ty, zoom):
+    vers = 92
     fname = os.path.join('cache', str(zoom), '%i_%i.jpg' % (tx, ty))
     if not os.path.isdir(os.path.dirname(fname)):
         os.makedirs(os.path.dirname(fname))
     if not os.path.isfile(fname):
-        url = "http://khm1.google.com/kh/v=89&x=%i&s=&y=%i&z=%s&s=" % (tx, ty, zoom)
+        random.seed()
+        num = random.choice([0, 1])
+        s = 'Galileo'
+        gal = s[:random.choice(range(1, len(s) + 1))]
+        url = "http://khm%s.google.com/kh/v=%s&x=%i&y=%i&z=%s&s=%s" % (num, vers, tx, ty, zoom, gal)
         print "getting %i x %i" % (tx, ty)
         urllib.urlretrieve(url, fname)
     a = os.stat(fname)
