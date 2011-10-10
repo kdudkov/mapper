@@ -1,6 +1,7 @@
 <!DOCTYPE HTML>
 <html>
 <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <title></title>
     <style>
         html { height: 100% }
@@ -57,8 +58,13 @@
       function redraw() {
           linesArray.forEach(function(l) {l.setMap(null); delete(l); });
           if (lt != null) {
+            // A4
             var w = 538.582677165;
             var h = 745.196850394;
+            // A2
+//            var h = 1133.85826772;
+//            var w = 1587.08661417;
+            
             var cm = 28.3464566929;
             var perekr = 0.2;
             var scale = $('#scale')[0].value;
