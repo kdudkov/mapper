@@ -88,3 +88,7 @@ def get_true_angle(p):
 def get_point_radius(p, true_angle): 
     return (1 / math.sqrt((pow(math.cos(math.radians(true_angle)), 2) / MAJOR_AXIS_POW_2) + (pow(math.sin(math.radians(true_angle)), 2) / MINOR_AXIS_POW_2))) + p.elev
 
+def mperdeg(lon, lat):
+    n1 = distance(Point(lon, lat), Point(lon + 1, lat))[0]
+    n2 = distance(Point(lon, lat), Point(lon, lat + 1))[0]
+    return n1, n2
