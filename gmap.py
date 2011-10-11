@@ -1,8 +1,10 @@
 # coding: utf-8
 import random
 import Image
+import ImageDraw
 import ImageEnhance
 import gpslib
+import kmlr
 
 __author__ = 'madrider'
 
@@ -123,7 +125,7 @@ class GmapMap(object):
         if sharpness != 1.0:
             self.map_img = ImageEnhance.Sharpness(self.map_img).enhance(sharpness)
 
-    def get_map(self, save_file=None):
+    def get_map(self):
         self.map_img = Image.new("RGBA", (self.fullsize.x, self.fullsize.y), (200, 200, 200))
         for ty in range(self.ty1, self.ty2 + 1):
             for tx in range(self.tx1, self.tx2 + 1):
@@ -147,20 +149,19 @@ class GmapMap(object):
             self.map_img = self.map_img1
         self.m_per_pix = mx / self.mapsize.x
         self.m_per_pix_y =  my / self.mapsize.y
-#
-#        if opts.kml:
-#            res = kmlr.process(opts.kml)
-#            draw = ImageDraw.Draw(self.map_img)
-#
-#            for l in res['lines']:
-#                points = []
-#                for p in l['coords']:
-#                    points.append(self.lonlat2xy(p[0], p[1]))
-#                draw.line(points)
 
-        if save_file:
-            self.map_img.save(save_file, "JPEG")
+    def save(self, save_file):
+        self.map_img.save(save_file, "JPEG")
 
+    def draw_kml(self, kml):
+        res = kmlr.process(kml)
+        draw = ImageDraw.Draw(self.map_img)
+
+        for l in res['lines']:
+            points = []
+            for p in l['coords']:
+                points.append(self.lonlat2xy(p[0], p[1]))
+            draw.line(points)
 
 if __name__ == '__main__':
 

@@ -21,4 +21,4 @@ for ps in ['A0', 'A1', 'A2', 'A3', 'A4']:
     xp2, yp2 = maxx - page_border, maxy - page_border
     yp2 -= 10 + 30 # for page title
 
-    print (xp2-xp1), (yp2-yp1)
+    print "w = %s;\nh = %s" % (xp2 - xp1, yp2 - yp1)

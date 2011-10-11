@@ -42,8 +42,8 @@ def main():
             D_GRID.append(c * pow(10, -i))
     FONT = 'Droid'
     pdfmetrics.registerFont(ttfonts.TTFont(FONT, 'DroidSansMono.ttf'))
-    if opts.ps in pagesizes.__dict__:
-        page_size = pagesizes.__dict__[opts.ps]
+    if opts.ps.upper() in pagesizes.__dict__:
+        page_size = pagesizes.__dict__[opts.ps.upper()]
     else:
         raise Exception("%s is frong page format" % opts.ps)
     if opts.land:
@@ -55,7 +55,7 @@ def main():
         return 1
 
     # page size
-    c = Canvas(opts.filename, pagesize=page_size)
+    c = Canvas(opts.filename + '.pdf', pagesize=page_size)
     maxx, maxy = page_size
     page_border = 1 * cm
     xp1, yp1 = page_border, page_border
@@ -68,16 +68,23 @@ def main():
     # size in meters
     size_m = map(lambda x: x / cm * opts.scale, full_size)
     kx, ky = gpslib.mperdeg(lon1, lat1)
-    lon2, lat2 = lon1 - size_m[0] / kx, lat1 + size_m[1] / ky
+    lon2, lat2 = lon1 + size_m[0] / kx, lat1 - size_m[1] / ky
     zoom = opts.zoom
     map_ = GmapMap()
     map_.set_ll(lon1, lat1, lon2, lat2, zoom)
-    map_.get_map(save_file='test.jpg')
+    map_.get_map()
+    map_.enhance(brightness=opts.bright, contrast=opts.contrast)
+    if opts.kml:
+        map_.draw_kml(opts.kml)
+    map_.save(opts.filename + '.jpg')
+
     print "got %i x %i map" % (map_.fullsize.x, map_.fullsize.y)
     # map to pdf pixels
     koeffx, koeffy = map_.mapsize.x / full_size[0], map_.mapsize.y / full_size[1]
     one_page_size_x, one_page_size_y = int((xp2 - xp1) * koeffx), int((yp2 - yp1) * koeffy)
-
+    dpi = inch * one_page_size_x / (xp2 - xp1)
+    print "result is %i dpi" % dpi
+    
     # pixels in deg of x axis (lon)
     pdegx = abs(map_.lonlat2xy(lon1 + 1, lat1)[0] - map_.lonlat2xy(lon1, lat1)[0])
     pdegx /= koeffx # to pdf pixels
@@ -87,8 +94,9 @@ def main():
     else:
         grid = DMS_GRID
     d_deg_x = 1
+    min_grid_with = 2 * cm
     for i in grid:
-        if i * pdegx < 1 * cm:
+        if i * pdegx < min_grid_with:
             break
         d_deg_x = i
     # pixels in deg of y axis (lat)
@@ -96,7 +104,7 @@ def main():
     pdegy /= koeffy # to pdf pixels
     d_deg_y = 1
     for i in grid:
-        if i * pdegy < 1 * cm:
+        if i * pdegy < min_grid_with:
             break
         d_deg_y = i
     m_in_cm_x = gpslib.distance(gpslib.Point(lon1, lat1), gpslib.Point(lon1 + cm / pdegx, lat1))[0]
@@ -104,12 +112,15 @@ def main():
     #print m_in_cm_x, m_in_cm_y
 
     # splitting map to pdf pages
-    numpages = 0
     for py in range(opts.numy):
         for px in range(opts.numx):
             c.setFont(FONT, 10)
             c.drawString(xp1, maxy - page_border - 10, '%s (1см = %iм)' % (opts.title, round(m_in_cm_x)))
-            c.line(xp2 - cm, maxy - page_border - 5, xp2, maxy - page_border - 5)
+            # draw 1cm angle
+            xx1 = xp2
+            yy1 = maxy - page_border - 5
+            c.line(xx1 - cm, yy1, xx1, yy1)
+            c.line(xx1, yy1, xx1, yy1 - cm)
             tx1 = map_.xp1 + int(one_page_size_x * (1. - PEREKR) * px)
             ty1 = map_.yp1 + int(one_page_size_y * (1. - PEREKR) * py)
 
@@ -190,18 +201,17 @@ def main():
                 c.restoreState()
             c.showPage()
     c.save()
-    print "%s pages in pdf" % numpages
 
 if __name__ == '__main__':
     global opts
 
     parser = OptionParser()
     parser.add_option("-f", "--file", dest="filename",
-                  help="output pdf name", metavar="FILE", default="map.pdf")
+                  help="output pdf name", metavar="FILE", default="map")
     parser.add_option("-t", "--title", dest="title",
                   help="map title", default="Каннельярви")
     parser.add_option("--coords", dest="c",
-                  help="lover bottom corner", metavar="lon1,lat1", default="29.35,60.3167")
+                  help="lover bottom corner", metavar="lon,lat", default="29.35,60.3167")
     parser.add_option("-z", "--zoom", dest="zoom",
                   help="zoom (10-18)", metavar="n", type="int", default=17)
     parser.add_option("--deg", dest="deg", action="store_true",
@@ -209,9 +219,9 @@ if __name__ == '__main__':
     parser.add_option("--scale", dest="scale", type="int",
                   help="scale in meters in cm", default=0)
     parser.add_option("--px", "--pages_x", dest="numx", type="int",
-                  help="fit in n pages with", default=1)
+                  help="n pages with", default=1)
     parser.add_option("--py", "--pages_y", dest="numy", type="int",
-                  help="fit in n pages height", default=1)
+                  help="n pages height", default=1)
     parser.add_option("--page_size", dest="ps",
                   help="page format (A4, A3, etc)", default="A4")
     parser.add_option("--land", dest="land", action="store_true",
@@ -226,12 +236,12 @@ if __name__ == '__main__':
         main()
     except KeyboardInterrupt:
         print "interrupted"
-#    except Exception, ex:
-#        raise ex
+    except Exception, ex:
+        raise ex
     finally:
         print "deleting temp files"
         for s in glob.glob('tmp*.jpg'):
-            #os.unlink(s)
+            os.unlink(s)
             pass
 
   
