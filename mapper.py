@@ -72,7 +72,7 @@ def main():
     zoom = opts.zoom
     map_ = GmapMap()
     map_.set_ll(lon1, lat1, lon2, lat2, zoom)
-    map_.get_map()
+    map_.get_map(download=opts.download)
     map_.enhance(brightness=opts.bright, contrast=opts.contrast)
     if opts.kml:
         map_.draw_kml(opts.kml)
@@ -230,6 +230,8 @@ if __name__ == '__main__':
     parser.add_option("--bright", dest="bright", type="float", default=1.5)
     parser.add_option("-k", "--kml", dest="kml", metavar="FILE",
                   help="kml file", default='')
+    parser.add_option("--dry", dest="download", action="store_false",
+                  help="do not download tiles", default=True)
     opts, args = parser.parse_args()
 
     try:

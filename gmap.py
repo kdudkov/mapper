@@ -43,12 +43,12 @@ def pixel_to_lonlat(gx, gy, zoom):
     lat = math.degrees(math.atan(math.sinh(y1)))
     return lon, lat
 
-def get_tile(tx, ty, zoom):
+def get_tile(tx, ty, zoom, download=True):
     vers = 92
     fname = os.path.join('cache', str(zoom), '%i_%i.jpg' % (tx, ty))
     if not os.path.isdir(os.path.dirname(fname)):
         os.makedirs(os.path.dirname(fname))
-    if not os.path.isfile(fname):
+    if not os.path.isfile(fname) and download:
         random.seed()
         num = random.choice([0, 1])
         s = 'Galileo'
@@ -56,10 +56,11 @@ def get_tile(tx, ty, zoom):
         url = "http://khm%s.google.com/kh/v=%s&x=%i&y=%i&z=%s&s=%s" % (num, vers, tx, ty, zoom, gal)
         print "getting %i x %i" % (tx, ty)
         urllib.urlretrieve(url, fname)
-    a = os.stat(fname)
-    if a.st_size < 5000:
-        print "invalid file?"
-        os.unlink(fname)
+    if os.path.isfile(fname):
+        a = os.stat(fname)
+        if a.st_size < 5000:
+            print "invalid file?"
+            os.unlink(fname)
     return fname
 
 class P(object):
@@ -125,11 +126,11 @@ class GmapMap(object):
         if sharpness != 1.0:
             self.map_img = ImageEnhance.Sharpness(self.map_img).enhance(sharpness)
 
-    def get_map(self):
+    def get_map(self, download=True):
         self.map_img = Image.new("RGBA", (self.fullsize.x, self.fullsize.y), (200, 200, 200))
         for ty in range(self.ty1, self.ty2 + 1):
             for tx in range(self.tx1, self.tx2 + 1):
-                fname = get_tile(tx, ty, self.zoom)
+                fname = get_tile(tx, ty, self.zoom, download)
                 try:
                     img1 = Image.open(fname)
                 except:
