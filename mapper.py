@@ -10,7 +10,7 @@ from reportlab.lib.units import cm, mm, inch
 from reportlab.pdfbase import pdfmetrics, ttfonts
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.lib.pagesizes import landscape
-from gmap import GmapMap
+from gmap import GmapMap, OsmMap
 
 import gpslib
 
@@ -70,7 +70,8 @@ def main():
     kx, ky = gpslib.mperdeg(lon1, lat1)
     lon2, lat2 = lon1 + size_m[0] / kx, lat1 - size_m[1] / ky
     zoom = opts.zoom
-    map_ = GmapMap()
+#    map_ = GmapMap()
+    map_ = OsmMap()
     map_.set_ll(lon1, lat1, lon2, lat2, zoom)
     map_.get_map(download=opts.download)
     map_.enhance(brightness=opts.bright, contrast=opts.contrast)
@@ -94,7 +95,7 @@ def main():
     else:
         grid = DMS_GRID
     d_deg_x = 1
-    min_grid_with = 2 * cm
+    min_grid_with = 1. * cm
     for i in grid:
         if i * pdegx < min_grid_with:
             break
@@ -147,12 +148,17 @@ def main():
                 xp = (x - tx1) / koeffx
                 d, m, s = deg2dms(degx)
                 if m == 0 and s < 0.0001:
-                    c.setLineWidth(3)
-                    c.setStrokeColorRGB(1, 0, 0)
+                    # degree line
+                    c.setStrokeAlpha(0.7)
+#                    c.setLineWidth(3)
+                    c.setStrokeColorRGB(0, 0, 0)
                 elif s < 0.0001:
-                    c.setLineWidth(2)
-                    c.setStrokeColorRGB(0, 1, 0)
+                    # minute line
+                    c.setStrokeAlpha(0.5)
+#                    c.setLineWidth(2)
+                    c.setStrokeColorRGB(0, 0, 0)
                 else:
+                    c.setStrokeAlpha(0.2)
                     c.setLineWidth(1)
                     c.setStrokeColorRGB(0, 0, 0)
                 c.line(xp + xp1, yp1, xp + xp1, yp2)
@@ -175,11 +181,11 @@ def main():
                 yp = (y - ty1) / koeffy
                 d, m, s = deg2dms(degy)
                 if m == 0 and (s < 0.0001 or s > 59.9999):
-                    c.setLineWidth(3)
-                    c.setStrokeColorRGB(1, 0, 0)
+#                    c.setLineWidth(3)
+                    c.setStrokeColorRGB(0, 0, 0)
                 elif s < 0.0001:
-                    c.setLineWidth(2)
-                    c.setStrokeColorRGB(0, 1, 0)
+#                    c.setLineWidth(2)
+                    c.setStrokeColorRGB(0, 0, 0)
                 else:
                     c.setLineWidth(1)
                     c.setStrokeColorRGB(0, 0, 0)
@@ -238,8 +244,8 @@ if __name__ == '__main__':
         main()
     except KeyboardInterrupt:
         print "interrupted"
-    except Exception, ex:
-        raise ex
+#    except Exception, ex:
+#        raise ex
     finally:
         print "deleting temp files"
         for s in glob.glob('tmp*.jpg'):
