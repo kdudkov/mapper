@@ -110,10 +110,10 @@ class MapProvider(object):
 
         if self.correction:
             desty = int(my * self.fullsize.x / mx)
-            self.y_koeff = float(desty) / float(self.fullsize.y)
+            self.koeff_y = float(desty) / float(self.fullsize.y)
             self.map_img1 = self.map_img.resize((self.fullsize.x, desty), Image.BILINEAR)
             self.fullsize.y = desty
-            self.mapsize.y = int(self.mapsize.y * self.y_koeff)
+            self.mapsize.y = int(self.mapsize.y * self.koeff_y)
             self.map_img = self.map_img1
         self.m_per_pix = mx / self.mapsize.x
         self.m_per_pix_y =  my / self.mapsize.y
@@ -222,12 +222,73 @@ class OsmMap(MapProvider):
 #                os.unlink(fname)
         return fname
 
+class YandexSat(MapProvider):
+    equatorLength = 40075016.685578488 # Длина экватора
+    rn = 6378137. # Экваториальный радиус
+    e = 0.0818191908426 # Эксцентриситет
+
+    def lonlat_to_pixel(self, lon, lat):
+        """Перевод из географических координат в координаты на полной карте"""
+        num = 2. ** self.zoom # число тайлов
+        numpix = self.TILE_SIZE * num # пикселей на карте
+        a = numpix / self.equatorLength
+        b = self.equatorLength / 2
+        latr = math.radians(lat)
+        lonr = math.radians(lon)
+
+        esinLat = self.e * math.sin(latr)
+        tan_temp = math.tan(math.pi / 4.0 + latr / 2.0)
+        pow_temp = math.pow(math.tan(math.pi / 4.0 + math.asin(esinLat) / 2), self.e)
+        u = tan_temp / pow_temp
+        mx, my = self.rn * lonr, self.rn * math.log(u)
+        return int((b + mx) * a), int((b - my) * a)
+
+    def pixel_to_lonlat(self, gx, gy):
+        """Перевод координат на полной карте в географические координаты"""
+        num = 2. ** self.zoom # число тайлов
+        numpix = self.TILE_SIZE * num # пикселей на карте
+        a = numpix / self.equatorLength
+        b = self.equatorLength / 2
+        mx = gx / a - b
+        my = b - gy / a
+
+        ab = 0.00335655146887969400
+        bb = 0.00000657187271079536
+        cb = 0.00000001764564338702
+        db = 0.00000000005328478445
+
+        xphi = math.pi / 2 - 2 * math.atan(1. / math.exp(my / self.rn))
+
+        latr = xphi + ab * math.sin(2 * xphi) + bb * math.sin(4 * xphi) + cb * math.sin(6 * xphi) + db * math.sin(8 * xphi)
+        lonr = mx / self.rn
+
+        return math.degrees(lonr), math.degrees(latr)
+
+    def get_tile(self, tx, ty, download=True):
+        fname = os.path.join('cache', 'yandex', str(self.zoom), '%i_%i.jpg' % (tx, ty))
+        if not os.path.isdir(os.path.dirname(fname)):
+            os.makedirs(os.path.dirname(fname))
+        if not os.path.isfile(fname) and download:
+            random.seed()
+            num = random.choice(['01', '02', '03', '04'])
+            url = "http://sat%s.maps.yandex.net/tiles?l=sat&v=1.37.0&x=%s&y=%s&z=%s&lang=ru_RU" % (num, tx, ty, self.zoom)
+            print "getting %i x %i" % (tx, ty)
+            urllib.urlretrieve(url, fname)
+        if os.path.isfile(fname):
+            a = os.stat(fname)
+        return fname
+
 
 if __name__ == '__main__':
 
     lat1, lon1 = 60.3189, 29.3556
     lat2, lon2 = 60.3332, 29.3744
-    zoom = 17
-    m = GmapMap()
+    zoom = 15
+    m = OsmMap()
     m.set_ll(lon1, lat1, lon2, lat2, zoom)
-    m.get_map(save_file='test1.jpg')
+    m.get_map()
+    m.save('test_osm.jpg')
+    m = YandexSat()
+    m.set_ll(lon1, lat1, lon2, lat2, zoom)
+    m.get_map()
+    m.save('test_yand.jpg')

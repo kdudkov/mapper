@@ -6,11 +6,11 @@ import glob
 from optparse import OptionParser
 
 from reportlab.lib import pagesizes
-from reportlab.lib.units import cm, mm, inch
+from reportlab.lib.units import cm, inch
 from reportlab.pdfbase import pdfmetrics, ttfonts
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.lib.pagesizes import landscape
-from gmap import GmapMap, OsmMap
+from gmap import   YandexSat
 
 import gpslib
 
@@ -71,7 +71,8 @@ def main():
     lon2, lat2 = lon1 + size_m[0] / kx, lat1 - size_m[1] / ky
     zoom = opts.zoom
 #    map_ = GmapMap()
-    map_ = OsmMap()
+    #map_ = OsmMap()
+    map_ = YandexSat()
     map_.set_ll(lon1, lat1, lon2, lat2, zoom)
     map_.get_map(download=opts.download)
     map_.enhance(brightness=opts.bright, contrast=opts.contrast)
