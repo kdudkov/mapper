@@ -40,8 +40,18 @@ class Point(object):
     def to_dms(self):
         return ""
 
+def get_point(obj):
+    if obj.__class__ == Point:
+        return obj
+    if type(obj) in (list, tuple):
+        return Point(obj[0], obj[1])
+    if type(obj) == dict:
+        return Point(obj['lon'], obj['lat'])
+    return None
+
 # get arrays with gps coordinates, returns earth terrestrial distance between 2 points 
-def distance(p1, p2): 
+def distance(p1_, p2_): 
+    p1, p2 = get_point(p1_), get_point(p2_)
 
     true_angle_1 = get_true_angle(p1)
     true_angle_2 = get_true_angle(p2) 
@@ -64,7 +74,7 @@ def distance(p1, p2):
         pow(math.sin( fdPhi / 2.0), 2 ) + math.cos(math.radians(p2.lat))
         * math.cos(math.radians(p1.lat)) * pow(math.sin(fdLambda / 2.0), 2)
     ) )
-    fAlpha = math.asin(math.cos(math.radians(p2.lat)) * math.sin(fdLambda) / math.sin(fz))
+    fAlpha = math.asin(math.cos(math.radians(p2.lat)) * math.sin(fdLambda) / math.sin(fz or 0.0001))
     d = round(abs(math.degrees(fAlpha)))
 
     if p1.lon <= p2.lon:
