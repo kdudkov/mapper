@@ -1,7 +1,13 @@
-import random
-from flask import Flask, request, send_file
-from gmap import YandexSat
+#!/usr/bin/env python
+# coding: utf-8
+
+import tempfile
+from optparse import OptionParser
+
 import Image
+from flask import Flask, request, send_file
+
+from gmap import YandexSat
 
 app = Flask(__name__)
 
@@ -25,19 +31,23 @@ def wms():
     bbox = request.args.get('bbox')
     lon1, lat1, lon2, lat2 = map(lambda x: float(x), bbox.split(','))
     map_ = YandexSat()
-    map_.set_ll(lon1, lat1, lon2, lat2, 16)
+    map_.set_ll(lon1, lat1, lon2, lat2, opts.zoom)
     map_.get_map(download=True, crop=1)
 
     img1 = map_.map_img_crop.resize((w, h), Image.ANTIALIAS)
     img1.load()
-    print map_.xp1, map_.yp1
-    print map_.xp2, map_.yp2
-    n = random.randint(0, 99999)
-    fn = 'temp_%s.jpg' % n
+    file_, fn = tempfile.mkstemp()
     img1.save(fn, 'JPEG')
     return send_file(fn, mimetype='image/jpeg')
 
 
 if __name__ == "__main__":
+    global opts
+
+    parser = OptionParser()
+    parser.add_option("-z", "--zoom", dest="zoom",
+                  help="zoom (10-18)", metavar="n", type="int", default=17)
+    opts, args = parser.parse_args()
+
     app.debug = True
     app.run()
