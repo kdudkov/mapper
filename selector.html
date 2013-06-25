@@ -1,160 +1,201 @@
-<!DOCTYPE HTML>
+<!DOCTYPE html>
 <html>
 <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta charset="utf-8">
     <title></title>
-    <style>
-        html { height: 100% }
-        body { height: 100%; margin: 0; padding: 0; }
 
-        * {
-            font-family: Verdana, Arial, sans-serif;
-            font-size: 10pt;
-        }
+    <link rel="stylesheet" href="http://yandex.st/bootstrap/2.3.2/css/bootstrap.min.css">
+    <script type="text/javascript" src="http://yandex.st/jquery/2.0.2/jquery.min.js"></script>
+    <script type="text/javascript" src="http://yandex.st/bootstrap/2.3.2/js/bootstrap.min.js"></script>
 
-        #map_canvas {
-            width: 50%;
-            height: 100%;
-            float:left;
-        }
-
-        #right {
-            width: 50%;
-            float: right;
-        }
-    </style>
-    <script type="text/javascript" src="http://yandex.st/jquery/1.6.3/jquery.min.js"></script>
-    <script type="text/javascript" src="http://maps.googleapis.com/maps/api/js?sensor=false&libraries=geometry"></script>
+    <script type="text/javascript"
+            src="http://maps.googleapis.com/maps/api/js?sensor=false&libraries=geometry"></script>
 
     <script type="text/javascript">
-        var lt = new google.maps.LatLng(60.2696,30.4075);
+        var lt = new google.maps.LatLng(60.2696, 30.4075);
         var infowindow = new google.maps.InfoWindow();
         var map;
         var linesArray = []
 
-      function initialize() {
-        var latlng = new google.maps.LatLng(60.2696,30.4075);
-        var myOptions = {
-          zoom: 15,
-          center: latlng,
-          mapTypeId: google.maps.MapTypeId.SATELLITE,
-        };
-        map = new google.maps.Map($("#map_canvas")[0], myOptions);
-        google.maps.event.addListener(map, 'click', function(event) {
-            lt = event.latLng;
-            redraw();
-        });
-      }
+        function initialize() {
+            var latlng = new google.maps.LatLng(60.2696, 30.4075);
+            var myOptions = {
+                zoom: 15,
+                center: latlng,
+                mapTypeId: google.maps.MapTypeId.SATELLITE
+            };
+            map = new google.maps.Map($("#map_canvas")[0], myOptions);
+            google.maps.event.addListener(map, 'click', function (event) {
+                lt = event.latLng;
+                redraw();
+            });
+            resize_map();
+        }
 
-      function rnd(x) {
-          var k = Math.pow(10, 5)
-          return Math.round(x * k) / k;
-      }
+        function rnd(x) {
+            var k = Math.pow(10, 5)
+            return Math.round(x * k) / k;
+        }
 
-      function ll(lon, lat) {
-          return new google.maps.LatLng(lat, lon);
-      }
+        function ll(lon, lat) {
+            return new google.maps.LatLng(lat, lon);
+        }
 
-      function redraw() {
-          linesArray.forEach(function(l) {l.setMap(null); delete(l); });
-          if (lt != null) {
-            // A4
-            // A2
+        function resize_map() {
+            var h = $(window).height();
+            offsetTop = 0;
+            $('#map_canvas').css('height', (h - offsetTop));
+        }
+
+        function redraw() {
+            linesArray.forEach(function (l) {
+                l.setMap(null);
+                delete(l);
+            });
+            if (lt != null) {
+                // A4
+                // A2
 //            var h = 1133.85826772;
 //            var w = 1587.08661417;
-            
-            var cm = 28.3464566929;
-            var perekr = 0.2;
 
-            var w = 0;
-            var h = 0;
-            var land = $('#land')[0].checked;
-            var formt = $('#format')[0].value.toUpperCase();
-            switch(formt) {
-                case "A4":
-                    w = 538.582677165;
-                    h = 745.196850394;
-                    break;
-                case "A3":
-                    w = 785.196850394;
-                    h = 1093.85826772;
-                    break;
-                case "A2":
-                    w = 1133.85826772;
-                    h = 1587.08661417;
-                    break;
-                case "A1":
-                    w = 1627.08661417;
-                    h = 2284.40944882;
-                    break;
-                case "A0":
-                    w = 2324.40944882;
-                    h = 3270.86614173;
-            }
-            if (land) {
-                var w1 = w;
-                w = h;
-                h = w1;
-            }
-            var scale = $('#scale')[0].value;
-            var m2d_x = google.maps.geometry.spherical.computeDistanceBetween(lt, ll(lt.lng() + 1, lt.lat()));
-            var m2d_y = google.maps.geometry.spherical.computeDistanceBetween(lt, ll(lt.lng(), lt.lat() - 1));
+                var cm = 28.3464566929;
+                var perekr = 0.2;
 
-            function plusm(l, dx, dy) {
-                return ll(l.lng() + dx / m2d_x, l.lat() - dy / m2d_y)
-            }
-            var w_m = w / cm * scale / 100;
-            var h_m = h / cm * scale / 100;
+                var w = 0;
+                var h = 0;
+                var land = $('#land')[0].checked;
+                var formt = $('#format')[0].value.toUpperCase();
+                switch (formt) {
+                    case "A4":
+                        w = 538.582677165;
+                        h = 745.196850394;
+                        break;
+                    case "A3":
+                        w = 785.196850394;
+                        h = 1093.85826772;
+                        break;
+                    case "A2":
+                        w = 1133.85826772;
+                        h = 1587.08661417;
+                        break;
+                    case "A1":
+                        w = 1627.08661417;
+                        h = 2284.40944882;
+                        break;
+                    case "A0":
+                        w = 2324.40944882;
+                        h = 3270.86614173;
+                }
+                if (land) {
+                    var w1 = w;
+                    w = h;
+                    h = w1;
+                }
+                var scale = $('#scale')[0].value;
+                var m2d_x = google.maps.geometry.spherical.computeDistanceBetween(lt, ll(lt.lng() + 1, lt.lat()));
+                var m2d_y = google.maps.geometry.spherical.computeDistanceBetween(lt, ll(lt.lng(), lt.lat() - 1));
 
-            for(iy=0; iy < $('#pages_y')[0].value; iy++) {
-                for(ix=0; ix < $('#pages_x')[0].value; ix++) {
-                    var lt1 = plusm(lt, ix * w_m * (1 - perekr), iy * h_m * (1 - perekr));
-                    var points = [
-                    lt1, plusm(lt1, w_m, 0), plusm(lt1, w_m, h_m), plusm(lt1, 0, h_m), lt1 ];
-                      var p1 = new google.maps.Polyline({
-                        path: points,
-                        strokeColor: "#FF0000",
-                        strokeOpacity: 1.0,
-                        strokeWeight: 2
-                      });
-
-                      p1.setMap(map);
-                      linesArray.push(p1);
+                function plusm(l, dx, dy) {
+                    return ll(l.lng() + dx / m2d_x, l.lat() - dy / m2d_y)
                 }
 
+                var w_m = w / cm * scale / 100;
+                var h_m = h / cm * scale / 100;
+
+                for (iy = 0; iy < $('#pages_y')[0].value; iy++) {
+                    for (ix = 0; ix < $('#pages_x')[0].value; ix++) {
+                        var lt1 = plusm(lt, ix * w_m * (1 - perekr), iy * h_m * (1 - perekr));
+                        var points = [
+                            lt1, plusm(lt1, w_m, 0), plusm(lt1, w_m, h_m), plusm(lt1, 0, h_m), lt1 ];
+                        var p1 = new google.maps.Polyline({
+                            path: points,
+                            strokeColor: "#FF0000",
+                            strokeOpacity: 1.0,
+                            strokeWeight: 2
+                        });
+
+                        p1.setMap(map);
+                        linesArray.push(p1);
+                    }
+
+                }
+                //var l2 = plusm(lt, ($('#pages_x')[0].value - 1) * (1 - perekr) * w_m + w_m, ($('#pages_y')[0].value - 1) * (1 - perekr) * h_m + h_m)
+                var fname = $('#file')[0].value + '_' + formt + '_' + scale / 100;
+                var title = $('#title')[0].value;
+                var text = 'python mapper.py --coords=' + rnd(lt.lng()) + ',' + rnd(lt.lat()) + ' --scale=' + scale / 100 + ' --page_size=' + formt;
+                if (land) text += ' --land';
+                text += " --pages_x=" + $('#pages_x')[0].value;
+                text += " --pages_y=" + $('#pages_y')[0].value;
+                text += " --file=\"" + fname + "\"";
+                text += " --title=\"" + title + "\"";
+                $('#result').text(text);
             }
-            //var l2 = plusm(lt, ($('#pages_x')[0].value - 1) * (1 - perekr) * w_m + w_m, ($('#pages_y')[0].value - 1) * (1 - perekr) * h_m + h_m)
-            var text = 'python mapper.py --coords=' + rnd(lt.lng()) + ',' + rnd(lt.lat()) + ' --scale=' + scale / 100 + ' --page_size=' + formt;
-            if (land) text += ' --land';
-            text += " --pages_x=" + $('#pages_x')[0].value;
-            text += " --pages_y=" + $('#pages_y')[0].value;
-            text += " --title=\"map\"";
-            text += " --file=\"file\"";
-            $('#result').text(text);
-          }
-      }
+        }
 
     </script>
 </head>
+
 <body onload="initialize();">
-    <div id="map_canvas"></div>
-    <div id="right"><h1>Подготовка для печати карты</h1>
-    <form>
-        <table>
-        <tr><td><label for="format">Формат</label></td><td><select onchange="redraw()" size="1" id="format" name="format">
-            <option value="a4" selected>A4</option>
-            <option value="a3">A3</option>
-            <option value="a2">A2</option>
-            <option value="a1">A1</option>
-            <option value="a0">A0</option>
-            </select></td></tr>
-        <tr><td><label for="land">Landscape</label></td><td><input  onchange="redraw()" id="land" name="land" type="checkbox" value="1"/></td></tr>
-        <tr><td><label for="pages_x">Страниц по x</label></td><td><input onchange="redraw()" size="15" id="pages_x" name="pages_x" value="1"/></td></tr>
-        <tr><td><label for="pages_y">Страниц по y</label></td><td><input onchange="redraw()" size="15" id="pages_y" name="pages_y" value="1"/></td></tr>
-        <tr><td><label for="scale">масштаб 1:</label></td><td><input onchange="redraw()" size="15" id="scale" name="scale" value="1000"/></td></tr>
-        </table>
-    </form>
-        <span id="result"></span>
+<div class="container-fluid">
+    <div class="row-fluid">
+        <div id="map_canvas" class="span8">
+        </div>
+        <div class="span4">
+            <form class="form">
+                <fieldset>
+                    <legend>Параметры карты</legend>
+
+                    <div class="control-group">
+                        <label for="file">Префикс файла</label>
+                        <input type="text" onchange="redraw()" id="file" name="file" value="filename"/>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="title">Заголовок</label>
+                        <input type="text" onchange="redraw()" id="title" name="title" value="title"/>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="format">Формат</label>
+                        <select onchange="redraw()" size="1" id="format" name="format">
+                            <option value="a4" selected>A4</option>
+                            <option value="a3">A3</option>
+                            <option value="a2">A2</option>
+                            <option value="a1">A1</option>
+                            <option value="a0">A0</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group">
+
+                        <label class="checkbox" for="land"><input type="checkbox" onchange="redraw()" id="land"
+                                                                  name="land" value="1"> Landscape</label>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="pages_x">Страниц по x</label>
+                        <input type="text" onchange="redraw()" size="15" id="pages_x" name="pages_x" value="1">
+                    </div>
+
+                    <div class="control-group">
+                        <label for="pages_y">Страниц по y</label>
+                        <input type="text" onchange="redraw()" size="15" id="pages_y" name="pages_y" value="1">
+                    </div>
+
+                    <div class="control-group">
+                        <label for="scale">масштаб</label>
+
+                        <div class="input-prepend">
+                            <span class="add-on">1:</span>
+                            <input type="text" onchange="redraw()" size="15" id="scale" name="scale" value="10000">
+                        </div>
+                    </div>
+                </fieldset>
+
+                <textarea id="result" class="disabled" cols="40" rows="10" disabled></textarea>
+            </form>
+        </div>
     </div>
+</div>
 </body>
 </html>
