@@ -7,13 +7,15 @@ from optparse import OptionParser
 import Image
 from flask import Flask, request, send_file
 
-from gmap import YandexSat
+from gmap import YandexSat, GmapMap
 
 app = Flask(__name__)
+
 
 @app.route("/")
 def hello():
     return "Hello World!"
+
 
 @app.route("/tms/<zoom>/")
 def tms(zoom):
@@ -24,6 +26,7 @@ def tms(zoom):
     f = provider.get_tile(x, y)
     return send_file(f, mimetype='image/jpeg')
 
+
 @app.route("/wms/")
 def wms():
     w = int(request.args.get('w'))
@@ -31,7 +34,13 @@ def wms():
     bbox = request.args.get('bbox')
     lon1, lat1, lon2, lat2 = map(lambda x: float(x), bbox.split(','))
     map_ = YandexSat()
-    map_.set_ll(lon1, lat1, lon2, lat2, opts.zoom)
+    #map_ = GmapMap()
+    for z in range(17, 10, -1):
+        map_.set_ll(lon1, lat1, lon2, lat2, z)
+        if (map_.xp2 - map_.xp1) < w:
+            z += 1
+            break
+    map_.set_ll(lon1, lat1, lon2, lat2, z)
     map_.get_map(download=True, crop=1)
 
     img1 = map_.map_img_crop.resize((w, h), Image.ANTIALIAS)
@@ -46,7 +55,7 @@ if __name__ == "__main__":
 
     parser = OptionParser()
     parser.add_option("-z", "--zoom", dest="zoom",
-                  help="zoom (10-18)", metavar="n", type="int", default=17)
+                      help="zoom (10-18)", metavar="n", type="int", default=17)
     opts, args = parser.parse_args()
 
     app.debug = True
