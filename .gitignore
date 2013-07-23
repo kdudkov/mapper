@@ -3,6 +3,7 @@
 *.tmp
 *.pdf
 *.jpg
+*.json
 cache
 points.txt
 *.kml

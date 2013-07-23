@@ -1,16 +1,19 @@
 #!/usr/bin/env python
 # coding: utf-8
-
+import codecs
+import json
 import os
-import glob
+import sys
 from optparse import OptionParser
+import tempfile
 
 from reportlab.lib import pagesizes
 from reportlab.lib.units import cm, inch
 from reportlab.pdfbase import pdfmetrics, ttfonts
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.lib.pagesizes import landscape
-from gmap import   YandexSat
+
+from gmap import YandexSat, OsmMap
 
 import gpslib
 
@@ -34,223 +37,258 @@ def deg2dms(deg):
 def dms2deg(d, m, s):
     return d + m / 60. + s / 3600.
 
-def main():
-    DMS_GRID = (dms2deg(0, 30, 0), dms2deg(0, 10, 0), dms2deg(0, 1, 0), dms2deg(0, 0, 30), dms2deg(0, 0, 10), dms2deg(0, 0, 5), dms2deg(0, 0, 2), dms2deg(0, 0, 1))
-    D_GRID = [1]
-    for i in range(1, 5):
-        for c in [5, 2, 1]:
-            D_GRID.append(c * pow(10, -i))
+class Mapper(object):
     FONT = 'Droid'
-    pdfmetrics.registerFont(ttfonts.TTFont(FONT, 'DroidSansMono.ttf'))
-    if opts.ps.upper() in pagesizes.__dict__:
-        page_size = pagesizes.__dict__[opts.ps.upper()]
-    else:
-        raise Exception("%s is frong page format" % opts.ps)
-    if opts.land:
-        page_size = landscape(page_size)
-    try:
-        lon1, lat1 = map(lambda x: float(x), opts.c.split(',', 1))
-    except:
-        print "smth wrong in command line!"
-        return 1
-
-    # page size
-    c = Canvas(opts.filename + '.pdf', pagesize=page_size)
-    maxx, maxy = page_size
-    page_border = 1 * cm
-    xp1, yp1 = page_border, page_border
-    xp2, yp2 = maxx - page_border, maxy - page_border
-    yp2 -= 10 + 30 # for page title
-
-    # full area size
-    full_size = (1. + (opts.numx - 1) * (1. - PEREKR)) * (xp2 - xp1), (1. + (opts.numy - 1) * (1. - PEREKR)) * (yp2 - yp1)
-    print "we need %i x %i image for pdf" % full_size
-    # size in meters
-    size_m = map(lambda x: x / cm * opts.scale, full_size)
-    kx, ky = gpslib.mperdeg(lon1, lat1)
-    lon2, lat2 = lon1 + size_m[0] / kx, lat1 - size_m[1] / ky
-    zoom = opts.zoom
-#    map_ = GmapMap()
-    #map_ = OsmMap()
-    map_ = YandexSat()
-    map_.set_ll(lon1, lat1, lon2, lat2, zoom)
-    map_.get_map(download=opts.download)
-    map_.enhance(brightness=opts.bright, contrast=opts.contrast)
-    if opts.kml:
-        map_.draw_kml(opts.kml)
-    map_.save(opts.filename + '.jpg')
-
-    print "got %i x %i map" % (map_.fullsize.x, map_.fullsize.y)
-    # map to pdf pixels
-    koeffx, koeffy = map_.mapsize.x / full_size[0], map_.mapsize.y / full_size[1]
-    one_page_size_x, one_page_size_y = int((xp2 - xp1) * koeffx), int((yp2 - yp1) * koeffy)
-    dpi = inch * one_page_size_x / (xp2 - xp1)
-    print "result is %i dpi" % dpi
+    config = {'provider': 'YSAT', 'deg': False, 'numx': 1, 'numy': 1, 'ps': 'A4', 'bright':1.5, 'contrast': 1.5, 'land': False}
     
-    # pixels in deg of x axis (lon)
-    pdegx = abs(map_.lonlat2xy(lon1 + 1, lat1)[0] - map_.lonlat2xy(lon1, lat1)[0])
-    pdegx /= koeffx # to pdf pixels
+    def __init__(self):
+        pdfmetrics.registerFont(ttfonts.TTFont(self.FONT, 'DroidSansMono.ttf'))
 
-    if opts.deg:
-        grid = D_GRID
-    else:
-        grid = DMS_GRID
-    d_deg_x = 1
-    min_grid_with = 1. * cm
-    for i in grid:
-        if i * pdegx < min_grid_with:
-            break
-        d_deg_x = i
-    # pixels in deg of y axis (lat)
-    pdegy = abs(map_.lonlat2xy(lon1, lat1 + 1)[1] - map_.lonlat2xy(lon1, lat1)[1])
-    pdegy /= koeffy # to pdf pixels
-    d_deg_y = 1
-    for i in grid:
-        if i * pdegy < min_grid_with:
-            break
-        d_deg_y = i
-    m_in_cm_x = gpslib.distance(gpslib.Point(lon1, lat1), gpslib.Point(lon1 + cm / pdegx, lat1))[0]
-    m_in_cm_y = gpslib.distance(gpslib.Point(lon1, lat1), gpslib.Point(lon1, lat1 + cm / pdegy))[0]
-    #print m_in_cm_x, m_in_cm_y
+    def save_config(self):
+        fname = self.config['config']
+        with codecs.open(fname, 'w', encoding='utf-8') as f:
+            json.dump(self.config, f)
 
-    # splitting map to pdf pages
-    for py in range(opts.numy):
-        for px in range(opts.numx):
-            c.setFont(FONT, 10)
-            c.drawString(xp1, maxy - page_border - 10, '%s (1см = %iм)' % (opts.title, round(m_in_cm_x)))
-            # draw 1cm angle
-            xx1 = xp2
-            yy1 = maxy - page_border - 5
-            c.line(xx1 - cm, yy1, xx1, yy1)
-            c.line(xx1, yy1, xx1, yy1 - cm)
-            tx1 = map_.xp1 + int(one_page_size_x * (1. - PEREKR) * px)
-            ty1 = map_.yp1 + int(one_page_size_y * (1. - PEREKR) * py)
+    def parse_opts(self, opts):
+        if opts.config:
+            if not os.path.isfile(opts.config):
+                print "cannot fount %s" % opts.config
+                sys.exit(1)
+            self.config = json.load(codecs.open(opts.config, 'r', encoding='utf-8'))
+        for k, v in opts.__dict__.iteritems():
+            if v:
+                self.config[k] = v
+        if not self.config.get('config', ''):
+            self.config['config'] = self.config['filename'] + '.json'
+        self.save_config()
+    
+    def get_grid(self):
+        if self.config['deg']:
+            grid = [1]
+            for i in range(1, 5):
+                for c in [5, 2, 1]:
+                    grid.append(c * pow(10, -i))
+            return grid
+        else:
+            return (dms2deg(0, 30, 0), dms2deg(0, 10, 0), dms2deg(0, 1, 0), dms2deg(0, 0, 30), dms2deg(0, 0, 10), dms2deg(0, 0, 5), dms2deg(0, 0, 2), dms2deg(0, 0, 1))
+    
+    def get_page_size(self):
+        if self.config['ps'].upper() in pagesizes.__dict__:
+            page_size = pagesizes.__dict__[self.config['ps']]
+        else:
+            raise Exception("%s is frong page format" % self.config['ps'])
+        if self.config['land']:
+            page_size = landscape(page_size)
+        return page_size        
+    
+    def get_provider(self):
+        if self.config['provider'].upper() == 'YSAT':
+            self.map_provider = YandexSat()
+        elif self.config['provider'].upper() == 'OSM':
+            self.map_provider = OsmMap()
+        else:
+            raise Exception('invalid map provider')
+        
+    def get_coords(self):
+        return map(lambda x: float(x), self.config['coords'].split(',', 1))
 
-            img1 = map_.map_img.crop((tx1, ty1, tx1 + one_page_size_x, ty1 + one_page_size_y))
-            img1.load()
-            pfname = "tmp-%s-%s.jpg" % (px, py)
-            img1.save(pfname, "JPEG")
-            c.drawImage(pfname, xp1, yp1, xp2 - xp1, yp2 - yp1)
-            #c.drawInlineImage(img1, xp1, yp1, xp2 - xp1, yp2 - yp1)
-            c.setStrokeColorRGB(0.0, 0.0, 0.0)
-            c.setLineWidth(1)
-            c.rect(xp1, yp1, xp2 - xp1, yp2 - yp1)
+    def calculate_coords(self):
+        self.maxx, self.maxy = self.get_page_size()
+        self.lon1, self.lat1 = self.get_coords()
+        page_border = 1 * cm
+        self.xp1, self.yp1 = page_border, page_border
+        self.xp2, self.yp2 = self.maxx - page_border, self.maxy - page_border
+        self.yp2 -= 10 + 30 # for page title
 
-            c.setStrokeAlpha(0.5)
-            # draw x grid
-            degx = int(lon1)
-            while 1:
-                degx += d_deg_x
-                x, _ = map_.lonlat2xy(degx, lat1)
-                if x <= tx1:
-                    continue
-                if x >= tx1 + one_page_size_x:
-                    break
-                xp = (x - tx1) / koeffx
-                d, m, s = deg2dms(degx)
-                if m == 0 and s < 0.0001:
-                    # degree line
-                    c.setStrokeAlpha(0.7)
-#                    c.setLineWidth(3)
-                    c.setStrokeColorRGB(0, 0, 0)
-                elif s < 0.0001:
-                    # minute line
-                    c.setStrokeAlpha(0.5)
-#                    c.setLineWidth(2)
-                    c.setStrokeColorRGB(0, 0, 0)
-                else:
-                    c.setStrokeAlpha(0.2)
-                    c.setLineWidth(1)
-                    c.setStrokeColorRGB(0, 0, 0)
-                c.line(xp + xp1, yp1, xp + xp1, yp2)
-                c.setFont(FONT, 5)
-                if opts.deg:
-                    text = "%.4f" % degx
-                else:
-                    text = "%iº%0.2i'%0.2i\"" % (d, m, round(s))
-                c.drawCentredString(xp + xp1, yp1 - 5, text)
-                c.drawCentredString(xp + xp1, yp2 + 5, text)
-            # draw y grid
-            degy = int(lat1) + 1
-            while 1:
-                degy -= d_deg_y
-                _, y = map_.lonlat2xy(lon1, degy)
-                if y <= ty1:
-                    continue
-                if y >= ty1 + one_page_size_y:
-                    break
-                yp = (y - ty1) / koeffy
-                d, m, s = deg2dms(degy)
-                if m == 0 and (s < 0.0001 or s > 59.9999):
-#                    c.setLineWidth(3)
-                    c.setStrokeColorRGB(0, 0, 0)
-                elif s < 0.0001:
-#                    c.setLineWidth(2)
-                    c.setStrokeColorRGB(0, 0, 0)
-                else:
-                    c.setLineWidth(1)
-                    c.setStrokeColorRGB(0, 0, 0)
-                c.line(xp1, yp2 - yp, xp2, yp2 - yp)
-                c.setFont(FONT, 5)
-                if opts.deg:
-                    text = "%.4f" % degy
-                else:
-                    text = "%iº%0.2i'%0.2i\"" % (d, m, round(s))
-                c.saveState()
-                c.translate(xp1 - 5, yp2 - yp)
-                c.rotate(90)
-                c.drawCentredString(0, 0, text)
-                c.restoreState()
-                c.saveState()
-                c.translate(xp2 + 10, yp2 - yp)
-                c.rotate(90)
-                c.drawCentredString(0, 0, text)
-                c.restoreState()
-            c.showPage()
-    c.save()
+        self.full_size = (1. + (self.config['numx'] - 1) * (1. - PEREKR)) * (self.xp2 - self.xp1), (1. + (self.config['numy'] - 1) * (1. - PEREKR)) * (self.yp2 - self.yp1)
+        print "we need %i px x %i px image for pdf" % self.full_size
+            # size in meters
+        image_size_meters = map(lambda x: x / cm * self.config['scale'], self.full_size)
+        mperdegx, mperdegy = gpslib.mperdeg(self.lon1, self.lat1)
+        self.lon2, self.lat2 = self.lon1 + image_size_meters[0] / mperdegx, self.lat1 - image_size_meters[1] / mperdegy
+
+    def get_image(self):
+        self.get_provider()
+        self.map_provider.set_ll(self.lon1, self.lat1, self.lon2, self.lat2, self.config['zoom'])
+        self.map_provider.get_map(download=self.config['download'])
+        self.map_provider.enhance(brightness=self.config['bright'], contrast=self.config['contrast'])
+        if self.config.get('kml'):
+            self.map_provider.draw_kml(self.config['kml'])
+        self.map_provider.save(self.config['filename'] + '.jpg')
+        print "got %i x %i map" % (self.map_provider.fullsize.x, self.map_provider.fullsize.y)
+
+    def map_2_pdf(self, x, y):
+        # map image coordinates to pdf coordinates
+        koeffx, koeffy = self.map_provider.mapsize.x / self.full_size[0], self.map_provider.mapsize.y / self.full_size[1]
+        return int(x / koeffx), int(y / koeffy)
+
+    def pdf_2_map(self, x, y):
+        # map image coordinates to pdf coordinates
+        koeffx, koeffy = self.map_provider.mapsize.x / self.full_size[0], self.map_provider.mapsize.y / self.full_size[1]
+        return int(x * koeffx), int(y * koeffy)
+
+    def format_coord(self, coord):
+        if self.config['deg']:
+            return "%.4f" % coord
+        else:
+            d, m, s = deg2dms(coord)
+            return "%iº%0.2i'%0.2i\"" % (d, m, round(s))
+
+    def get_grid_step(self, pdeg):
+        d_deg = 1
+        min_grid_with = 1. * cm
+        for i in self.get_grid():
+            if i * pdeg < min_grid_with:
+                break
+            d_deg = i
+        return d_deg
+
+
+    def get_x_grid(self, xm1, xm2, step):
+        degx = int(self.lon1)
+        while 1:
+            degx += step
+            x, _ = self.map_provider.lonlat2xy(degx, self.lat1)
+            if x <= xm1:
+                continue
+            if x >= xm2:
+                return
+            yield x, degx
+
+    def get_y_grid(self, ym1, ym2, step):
+        degy = int(self.lat1) + 1
+        while 1:
+            degy -= step
+            _, y = self.map_provider.lonlat2xy(self.lon1, degy)
+            if y <= ym1:
+                continue
+            if y >= ym2:
+                return
+            yield y, degy
+
+    def prepare_line(self, deg):
+        if not self.config['deg']:
+            d, m, s = deg2dms(deg)
+            if m == 0 and s < 0.0001:
+                # degree line
+                self.pdf.setStrokeAlpha(0.7)
+                self.pdf.setLineWidth(1)
+                self.pdf.setStrokeColorRGB(0, 0, 0)
+            elif s < 0.0001:
+                # minute line
+                self.pdf.setStrokeAlpha(0.5)
+                self.pdf.setLineWidth(1)
+                self.pdf.setStrokeColorRGB(0, 0, 0)
+            else:
+                self.pdf.setStrokeAlpha(0.2)
+                self.pdf.setLineWidth(1)
+                self.pdf.setStrokeColorRGB(0, 0, 0)
+        else:
+            self.pdf.setStrokeAlpha(0.5)
+            self.pdf.setLineWidth(1)
+            self.pdf.setStrokeColorRGB(0, 0, 0)
+
+
+    def add_page(self, image, xm1, ym1, xm2, ym2):
+        self.pdf.setFont(self.FONT, 10)
+        self.pdf.setTitle(self.config['title'])
+        self.pdf.drawString(self.xp1, self.yp2 + 20, '%s (1см = %iм)' % (self.config['title'], self.config['scale']))
+
+        pfname = tempfile.mktemp()
+        image.save(pfname, 'JPEG')
+        self.pdf.drawImage(pfname, self.xp1, self.yp1, self.xp2 - self.xp1, self.yp2 - self.yp1)
+        self.pdf.setStrokeColorRGB(0.0, 0.0, 0.0)
+        self.pdf.setLineWidth(1)
+        self.pdf.rect(self.xp1, self.yp1, self.xp2 - self.xp1, self.yp2 - self.yp1)
+        # x grid
+        pdegx = self.full_size[0] / abs(self.lon1 - self.lon2)
+        x_grid_step = self.get_grid_step(pdegx)
+        for x, degx in self.get_x_grid(xm1, xm2, x_grid_step):
+            x1, _ = self.map_2_pdf(x - xm1, 0)
+            self.prepare_line(degx)
+            self.pdf.line(self.xp1 + x1, self.yp1, self.xp1 + x1, self.yp2)
+            self.pdf.setFont(self.FONT, 5)
+            text = self.format_coord(degx)
+            self.pdf.drawCentredString(x1 + self.xp1, self.yp1 - 5, text)
+            self.pdf.drawCentredString(x1 + self.xp1, self.yp2 + 5, text)
+        # y grid
+        pdegy = self.full_size[1] / abs(self.lat1 - self.lat2)
+        y_grid_step = self.get_grid_step(pdegy)
+        for y, degy in self.get_y_grid(ym1, ym2, y_grid_step):
+            _, y1 = self.map_2_pdf(0, y - ym1)
+            self.prepare_line(degy)
+            self.pdf.line(self.xp1, self.yp2 - y1, self.xp2, self.yp2 - y1)
+            text = self.format_coord(degy)
+            self.pdf.saveState()
+            self.pdf.translate(self.xp1 - 5, self.yp2 - y1)
+            self.pdf.rotate(90)
+            self.pdf.drawCentredString(0, 0, text)
+            self.pdf.restoreState()
+            self.pdf.saveState()
+            self.pdf.translate(self.xp2 + 10, self.yp2 - y1)
+            self.pdf.rotate(90)
+            self.pdf.drawCentredString(0, 0, text)
+            self.pdf.restoreState()
+        self.pdf.showPage()
+
+
+    def run(self):
+        self.calculate_coords()
+        self.get_image()
+        self.to_pdf()
+
+    def to_pdf(self):
+        self.pdf = Canvas(self.config['filename'] + '.pdf', pagesize=[self.maxx, self.maxy])
+        one_page_size_x, one_page_size_y = self.pdf_2_map(self.xp2 - self.xp1, self.yp2 - self.yp1)
+        for py in range(self.config['numy']):
+            for px in range(self.config['numx']):
+                tx1 = self.map_provider.xp1 + int(one_page_size_x * (1. - PEREKR) * px)
+                ty1 = self.map_provider.yp1 + int(one_page_size_y * (1. - PEREKR) * py)
+                img = self.map_provider.map_img.crop((tx1, ty1, tx1 + one_page_size_x, ty1 + one_page_size_y))
+                img.load()
+                self.add_page(img, tx1, ty1, tx1 + one_page_size_x, ty1 + one_page_size_y)
+        self.pdf.save()
 
 if __name__ == '__main__':
-    global opts
 
     parser = OptionParser()
+    parser.add_option("--config", dest="config",
+                  help="config", metavar="FILE", default=None)
     parser.add_option("-f", "--file", dest="filename",
-                  help="output pdf name", metavar="FILE", default="map")
+                  help="output pdf name", metavar="FILE")
+    parser.add_option("--provider", dest="provider",
+                  help="map provider", metavar="(YSAT, OSM)")
     parser.add_option("-t", "--title", dest="title",
                   help="map title", default="Каннельярви")
-    parser.add_option("--coords", dest="c",
-                  help="lover bottom corner", metavar="lon,lat", default="29.35,60.3167")
+    parser.add_option("--coords", dest="coords",
+                  help="lover bottom corner", metavar="lon,lat")
     parser.add_option("-z", "--zoom", dest="zoom",
-                  help="zoom (10-18)", metavar="n", type="int", default=17)
+                  help="zoom (10-18)", metavar="n", type="int")
     parser.add_option("--deg", dest="deg", action="store_true",
-                  help="use d.dddd instead of d mm' s.sss", default=False)
+                  help="use d.dddd instead of d mm' s.sss")
     parser.add_option("--scale", dest="scale", type="int",
-                  help="scale in meters in cm", default=0)
+                  help="scale in meters in cm")
     parser.add_option("--px", "--pages_x", dest="numx", type="int",
-                  help="n pages with", default=1)
+                  help="n pages with")
     parser.add_option("--py", "--pages_y", dest="numy", type="int",
-                  help="n pages height", default=1)
+                  help="n pages height")
     parser.add_option("--page_size", dest="ps",
-                  help="page format (A4, A3, etc)", default="A4")
+                  help="page format (A4, A3, etc)")
     parser.add_option("--land", dest="land", action="store_true",
                   help="landscape page orientation", default=False)
-    parser.add_option("--contrast", dest="contrast", type="float", default=1.5)
-    parser.add_option("--bright", dest="bright", type="float", default=1.5)
+    parser.add_option("--contrast", dest="contrast", type="float")
+    parser.add_option("--bright", dest="bright", type="float")
     parser.add_option("-k", "--kml", dest="kml", metavar="FILE",
                   help="kml file", default='')
     parser.add_option("--dry", dest="download", action="store_false",
                   help="do not download tiles", default=True)
-    opts, args = parser.parse_args()
+    opts, _ = parser.parse_args()
 
     try:
-        main()
+        m = Mapper()
+        m.parse_opts(opts)
+        m.run()
     except KeyboardInterrupt:
         print "interrupted"
 #    except Exception, ex:
 #        raise ex
-    finally:
-        print "deleting temp files"
-        for s in glob.glob('tmp*.jpg'):
-            os.unlink(s)
-            pass
-
-  

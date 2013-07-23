@@ -121,7 +121,7 @@ class MapProvider(object):
             self.map_img = self.map_img1
             self.calculate_size()
         self.m_per_pix = mx / self.mapsize.x
-        self.m_per_pix_y =  my / self.mapsize.y
+        self.m_per_pix_y = my / self.mapsize.y
         if crop:
             map_img1 = self.map_img.crop((self.xp1, self.yp1, self.xp2, self.yp2))
             map_img1.load()
