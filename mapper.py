@@ -21,6 +21,7 @@ PEREKR = 0.2
 
 __author__ = 'madrider'
 
+
 def deg2dms(deg):
     dd = deg
     d = int(dd)
@@ -34,14 +35,20 @@ def deg2dms(deg):
         m += 1
     return d, m, s
 
+
 def dms2deg(d, m, s):
     return d + m / 60. + s / 3600.
 
+
 class Mapper(object):
     FONT = 'Droid'
-    config = {'provider': 'YSAT', 'deg': False, 'numx': 1, 'numy': 1, 'ps': 'A4', 'bright':1.5, 'contrast': 1.5, 'land': False}
-    
+    workdir = os.path.join(os.path.dirname(__file__), 'maps')
+    config = {'provider': 'YSAT', 'deg': False, 'numx': 1, 'numy': 1, 'ps': 'A4', 'bright': 1.5, 'contrast': 1.5,
+              'land': False}
+
     def __init__(self):
+        if not os.path.isdir(self.workdir):
+            os.mkdir(self.workdir)
         pdfmetrics.registerFont(ttfonts.TTFont(self.FONT, 'DroidSansMono.ttf'))
 
     def save_config(self):
@@ -59,9 +66,9 @@ class Mapper(object):
             if v:
                 self.config[k] = v
         if not self.config.get('config', ''):
-            self.config['config'] = self.config['filename'] + '.json'
+            self.config['config'] = os.path.join(self.workdir, self.config['filename'] + '.json')
         self.save_config()
-    
+
     def get_grid(self):
         if self.config['deg']:
             grid = [1]
@@ -70,8 +77,9 @@ class Mapper(object):
                     grid.append(c * pow(10, -i))
             return grid
         else:
-            return (dms2deg(0, 30, 0), dms2deg(0, 10, 0), dms2deg(0, 1, 0), dms2deg(0, 0, 30), dms2deg(0, 0, 10), dms2deg(0, 0, 5), dms2deg(0, 0, 2), dms2deg(0, 0, 1))
-    
+            return (dms2deg(0, 30, 0), dms2deg(0, 10, 0), dms2deg(0, 1, 0), dms2deg(0, 0, 30), dms2deg(0, 0, 10),
+                    dms2deg(0, 0, 5), dms2deg(0, 0, 2), dms2deg(0, 0, 1))
+
     def get_page_size(self):
         if self.config['ps'].upper() in pagesizes.__dict__:
             page_size = pagesizes.__dict__[self.config['ps']]
@@ -79,8 +87,8 @@ class Mapper(object):
             raise Exception("%s is frong page format" % self.config['ps'])
         if self.config['land']:
             page_size = landscape(page_size)
-        return page_size        
-    
+        return page_size
+
     def get_provider(self):
         if self.config['provider'].upper() == 'YSAT':
             self.map_provider = YandexSat()
@@ -88,7 +96,7 @@ class Mapper(object):
             self.map_provider = OsmMap()
         else:
             raise Exception('invalid map provider')
-        
+
     def get_coords(self):
         return map(lambda x: float(x), self.config['coords'].split(',', 1))
 
@@ -100,9 +108,10 @@ class Mapper(object):
         self.xp2, self.yp2 = self.maxx - page_border, self.maxy - page_border
         self.yp2 -= 10 + 30 # for page title
 
-        self.full_size = (1. + (self.config['numx'] - 1) * (1. - PEREKR)) * (self.xp2 - self.xp1), (1. + (self.config['numy'] - 1) * (1. - PEREKR)) * (self.yp2 - self.yp1)
+        self.full_size = (1. + (self.config['numx'] - 1) * (1. - PEREKR)) * (self.xp2 - self.xp1), (1. + (
+        self.config['numy'] - 1) * (1. - PEREKR)) * (self.yp2 - self.yp1)
         print "we need %i px x %i px image for pdf" % self.full_size
-            # size in meters
+        # size in meters
         image_size_meters = map(lambda x: x / cm * self.config['scale'], self.full_size)
         mperdegx, mperdegy = gpslib.mperdeg(self.lon1, self.lat1)
         self.lon2, self.lat2 = self.lon1 + image_size_meters[0] / mperdegx, self.lat1 - image_size_meters[1] / mperdegy
@@ -114,17 +123,20 @@ class Mapper(object):
         self.map_provider.enhance(brightness=self.config['bright'], contrast=self.config['contrast'])
         if self.config.get('kml'):
             self.map_provider.draw_kml(self.config['kml'])
-        self.map_provider.save(self.config['filename'] + '.jpg')
+        print "save to %s" % os.path.join(self.workdir, self.config['filename'] + '.jpg')
+        self.map_provider.save(os.path.join(self.workdir, self.config['filename'] + '.jpg'))
         print "got %i x %i map" % (self.map_provider.fullsize.x, self.map_provider.fullsize.y)
 
     def map_2_pdf(self, x, y):
         # map image coordinates to pdf coordinates
-        koeffx, koeffy = self.map_provider.mapsize.x / self.full_size[0], self.map_provider.mapsize.y / self.full_size[1]
+        koeffx, koeffy = self.map_provider.mapsize.x / self.full_size[0], self.map_provider.mapsize.y / self.full_size[
+            1]
         return int(x / koeffx), int(y / koeffy)
 
     def pdf_2_map(self, x, y):
         # map image coordinates to pdf coordinates
-        koeffx, koeffy = self.map_provider.mapsize.x / self.full_size[0], self.map_provider.mapsize.y / self.full_size[1]
+        koeffx, koeffy = self.map_provider.mapsize.x / self.full_size[0], self.map_provider.mapsize.y / self.full_size[
+            1]
         return int(x * koeffx), int(y * koeffy)
 
     def format_coord(self, coord):
@@ -211,7 +223,7 @@ class Mapper(object):
             text = self.format_coord(degx)
             self.pdf.drawCentredString(x1 + self.xp1, self.yp1 - 5, text)
             self.pdf.drawCentredString(x1 + self.xp1, self.yp2 + 5, text)
-        # y grid
+            # y grid
         pdegy = self.full_size[1] / abs(self.lat1 - self.lat2)
         y_grid_step = self.get_grid_step(pdegy)
         for y, degy in self.get_y_grid(ym1, ym2, y_grid_step):
@@ -238,7 +250,7 @@ class Mapper(object):
         self.to_pdf()
 
     def to_pdf(self):
-        self.pdf = Canvas(self.config['filename'] + '.pdf', pagesize=[self.maxx, self.maxy])
+        self.pdf = Canvas(os.path.join(self.workdir, self.config['filename'] + '.pdf'), pagesize=[self.maxx, self.maxy])
         one_page_size_x, one_page_size_y = self.pdf_2_map(self.xp2 - self.xp1, self.yp2 - self.yp1)
         for py in range(self.config['numy']):
             for px in range(self.config['numx']):
@@ -249,39 +261,40 @@ class Mapper(object):
                 self.add_page(img, tx1, ty1, tx1 + one_page_size_x, ty1 + one_page_size_y)
         self.pdf.save()
 
+
 if __name__ == '__main__':
 
     parser = OptionParser()
     parser.add_option("--config", dest="config",
-                  help="config", metavar="FILE", default=None)
+                      help="config", metavar="FILE", default=None)
     parser.add_option("-f", "--file", dest="filename",
-                  help="output pdf name", metavar="FILE")
+                      help="output pdf name", metavar="FILE")
     parser.add_option("--provider", dest="provider",
-                  help="map provider", metavar="(YSAT, OSM)")
+                      help="map provider", metavar="(YSAT, OSM)")
     parser.add_option("-t", "--title", dest="title",
-                  help="map title", default="Каннельярви")
+                      help="map title", default="Каннельярви")
     parser.add_option("--coords", dest="coords",
-                  help="lover bottom corner", metavar="lon,lat")
+                      help="lover bottom corner", metavar="lon,lat")
     parser.add_option("-z", "--zoom", dest="zoom",
-                  help="zoom (10-18)", metavar="n", type="int")
+                      help="zoom (10-18)", metavar="n", type="int")
     parser.add_option("--deg", dest="deg", action="store_true",
-                  help="use d.dddd instead of d mm' s.sss")
+                      help="use d.dddd instead of d mm' s.sss")
     parser.add_option("--scale", dest="scale", type="int",
-                  help="scale in meters in cm")
+                      help="scale in meters in cm")
     parser.add_option("--px", "--pages_x", dest="numx", type="int",
-                  help="n pages with")
+                      help="n pages with")
     parser.add_option("--py", "--pages_y", dest="numy", type="int",
-                  help="n pages height")
+                      help="n pages height")
     parser.add_option("--page_size", dest="ps",
-                  help="page format (A4, A3, etc)")
+                      help="page format (A4, A3, etc)")
     parser.add_option("--land", dest="land", action="store_true",
-                  help="landscape page orientation", default=False)
+                      help="landscape page orientation", default=False)
     parser.add_option("--contrast", dest="contrast", type="float")
     parser.add_option("--bright", dest="bright", type="float")
     parser.add_option("-k", "--kml", dest="kml", metavar="FILE",
-                  help="kml file", default='')
+                      help="kml file", default='')
     parser.add_option("--dry", dest="download", action="store_false",
-                  help="do not download tiles", default=True)
+                      help="do not download tiles", default=True)
     opts, _ = parser.parse_args()
 
     try:

@@ -5,6 +5,7 @@
 *.jpg
 *.json
 cache
+maps
 points.txt
 *.kml
 *.sh
