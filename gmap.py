@@ -199,7 +199,9 @@ class GmapMap(MapProvider):
         return fname
 
 class OsmMap(MapProvider):
-
+    nums = ['a', 'b', 'c']
+    url = 'http://%(num)s.tile.openstreetmap.org/%(z)s/%(x)s/%(y)s.png'
+    path = 'osm'
     def lonlat_to_pixel(self, lon, lat):
         lat_rad = math.radians(lat)
         n = 2.0 ** self.zoom
@@ -215,13 +217,13 @@ class OsmMap(MapProvider):
         return lon_deg, lat_deg
 
     def get_tile(self, tx, ty, download=True):
-        fname = os.path.join('cache', 'osm', str(self.zoom), '%i_%i.png' % (tx, ty))
+        fname = os.path.join('cache', self.path, str(self.zoom), '%i_%i.png' % (tx, ty))
         if not os.path.isdir(os.path.dirname(fname)):
             os.makedirs(os.path.dirname(fname))
         if not os.path.isfile(fname) and download:
             random.seed()
-            num = random.choice(['a', 'b', 'c'])
-            url = "http://%s.tile.openstreetmap.org/%s/%s/%s.png" % (num, self.zoom, tx, ty)
+            num = random.choice(self.nums)
+            url = self.url % {'num':num, 'z':self.zoom, 'x':tx, 'y':ty}
             print "getting %i x %i" % (tx, ty)
             urllib.urlretrieve(url, fname)
         if os.path.isfile(fname):
@@ -230,6 +232,11 @@ class OsmMap(MapProvider):
 #                print "invalid file?"
 #                os.unlink(fname)
         return fname
+
+class CicleMap(OsmMap):
+    nums = ['a', 'b']
+    url = "http://%(num)s.tile.opencyclemap.org/cycle/%(z)s/%(x)s/%(y)s.png"
+    path = 'osm_cicle'
 
 class YandexSat(MapProvider):
     equatorLength = 40075016.685578488 # Длина экватора
