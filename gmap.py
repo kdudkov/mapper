@@ -1,18 +1,20 @@
 # coding: utf-8
+import logging
 import random
 import Image
 import ImageDraw
 import ImageEnhance
+import time
 import gpslib
 import kmlr
-
-__author__ = 'madrider'
-
 import os
 import math
 import urllib
 
-class P(object):
+__author__ = 'madrider'
+
+
+class Point(object):
     x = None
     y = None
 
@@ -23,40 +25,54 @@ class P(object):
     def __str__(self):
         return "%i x %i" % (self.x, self.y)
 
+
+class Box(object):
+    def __init__(self, x1, y1, x2, y2):
+        self.p1 = Point(x1, y1)
+        self.p2 = Point(x2, y2)
+
+    @property
+    def w(self):
+        return abs(self.p2.x - self.p1.x)
+
+    @property
+    def h(self):
+        return abs(self.p2.y - self.p1.y)
+
+    @property
+    def size(self):
+        return Point(abs(self.p2.x - self.p1.x), abs(self.p2.y - self.p1.y))
+
+
 class MapProvider(object):
     TILE_SIZE = 256
-    map_img = None
-    correction = True
-    zoom = 17
-    koeff_y = 1
-    tx1 = ty1 = tx2 = ty2 = 0
-    lon1 = lat1 = lon2 = lat2 = 0
-    fullsize = None
-    mapsize = None
+    ext = 'jpg'
+    path = '---'
 
-    def lonlat_to_pixel(self, lon, lat):
-        raise Exception('not implemented')
+    def __init__(self):
+        self.orig_img = None
+        self.img = None
+        self.resize = True
+        self.zoom = 17
+        self.koeff_y = 1
+        self.tiles = None
+        self.big_pixels = None
+        self.lon1 = self.lat1 = self.lon2 = self.lat2 = 0
+        self.m_per_pix = 0
+        self.crop = False
 
-    def pixel_to_lonlat(self, lon, lat):
-        raise Exception('not implemented')
-
-    def get_tile(self, tx, ty, download=True):
-        raise Exception('not implemented')
-
-    def set_size(self, tx1, ty1, nx, ny, zoom):
+    def set_tiles(self, tx1, ty1, nx, ny, zoom):
         """
         устанавливаем размер для получения карты в тайлах
         """
         self.zoom = zoom
-        self.tx1 = tx1
-        self.tx2 = tx1 + nx - 1
-        self.ty1 = ty1
-        self.ty2 = ty1 + ny - 1
-        self.mapsize = self.fullsize = P(nx * self.TILE_SIZE, ny * self.TILE_SIZE)
-        self.xp1, self.yp1 = 0, 0
-        self.xp2, self.yp2 = self.mapsize
-        self.lon1, self.lat1 = self.pixel_to_lonlat(self.tx1 * self.TILE_SIZE, self.ty1 * self.TILE_SIZE)
-        self.lon2, self.lat2 = self.pixel_to_lonlat((self.tx2 + 1) * self.TILE_SIZE, (self.ty2 + 1) * self.TILE_SIZE)
+        self.tiles = Box(tx1, ty1, tx1 + nx - 1, ty1 + ny - 1)
+        self.big_pixels = Box(self.tiles.p1.x * self.TILE_SIZE,
+                              self.tiles.p1.y * self.TILE_SIZE,
+                              (self.tiles.p2.x + 1) * self.TILE_SIZE,
+                              (self.tiles.p2.y + 1) * self.TILE_SIZE)
+        self.lon1, self.lat1 = self.pixel_to_lonlat(self.big_pixels.p1.x, self.big_pixels.p1.y)
+        self.lon2, self.lat2 = self.pixel_to_lonlat(self.big_pixels.p2.x, self.big_pixels.p2.y)
 
     def set_ll(self, lon1, lat1, lon2, lat2, zoom):
         """
@@ -67,72 +83,99 @@ class MapProvider(object):
         self.lon1 = min(lon1, lon2)
         self.lon2 = max(lon1, lon2)
         self.zoom = zoom
-        self.tx1, self.ty1 = self.lonlat2tile(self.lon1, self.lat1)
-        self.tx2, self.ty2 = self.lonlat2tile(self.lon2, self.lat2)
-        # size of image (int. number of tiles)
-        self.fullsize = P((self.tx2 - self.tx1 + 1) * self.TILE_SIZE, (self.ty2 - self.ty1 + 1) * self.TILE_SIZE)
-        self.calculate_size()
+        self.crop = True
+        tx1, ty1 = self.lonlat2tile(self.lon1, self.lat1)
+        tx2, ty2 = self.lonlat2tile(self.lon2, self.lat2)
+        self.tiles = Box(tx1, ty1, tx2, ty2)
+        self.big_pixels = Box(self.tiles.p1.x * self.TILE_SIZE,
+                              self.tiles.p1.y * self.TILE_SIZE,
+                              (self.tiles.p2.x + 1) * self.TILE_SIZE,
+                              (self.tiles.p2.y + 1) * self.TILE_SIZE)
 
-    def calculate_size(self):
-        # coords. of exact image
-        self.xp1, self.yp1 = self.lonlat2xy(self.lon1, self.lat1)
-        self.xp2, self.yp2 = self.lonlat2xy(self.lon2, self.lat2)
-        # size of exact image
-        self.mapsize = P(self.xp2 - self.xp1, self.yp2 - self.yp1)
+    def _get_tile(self, tx, ty):
+        fname = os.path.join('cache', self.path, str(self.zoom), '%i_%i.%s' % (tx, ty, self.ext))
+        if not os.path.isdir(os.path.dirname(fname)):
+            os.makedirs(os.path.dirname(fname))
+        if os.path.isfile(fname):
+            a = os.stat(fname)
+            if time.time() - a.st_mtime > 10 * 24 * 60 * 60:
+                logging.info('old tile %s x %s, reget', tx, ty)
+                self.get_tile(fname, tx, ty)
+        else:
+            logging.info('getting tile %s x %s', tx, ty)
+            self.get_tile(fname, tx, ty)
+        return fname
+
+    def lonlat_to_pixel(self, lon, lat):
+        raise Exception('not implemented')
+
+    def pixel_to_lonlat(self, lon, lat):
+        raise Exception('not implemented')
+
+    def get_tile(self, fname, tx, ty):
+        raise Exception('not implemented')
 
     def lonlat2xy(self, lon, lat):
         """
         перевод градусов в координаты на картинке
         """
         x, y = self.lonlat_to_pixel(lon, lat)
-        x -= self.tx1 * self.TILE_SIZE
-        y -= self.ty1 * self.TILE_SIZE
+        x -= self.big_pixels.p1.x
+        y -= self.big_pixels.p1.y
         y = int(y * self.koeff_y)
         return x, y
 
     def lonlat2tile(self, lon, lat):
         """Перевод из географических координат в номер тайла, содержащего точку"""
         gx, gy = self.lonlat_to_pixel(lon, lat)
-        n = int(gx / self.TILE_SIZE)
-        m = int(gy / self.TILE_SIZE)
-        return n, m
+        return int(gx / self.TILE_SIZE), int(gy / self.TILE_SIZE)
 
-    def get_map(self, download=True, crop=False):
-        self.map_img = Image.new("RGBA", (self.fullsize.x, self.fullsize.y), (200, 200, 200))
-        for ty in range(self.ty1, self.ty2 + 1):
-            for tx in range(self.tx1, self.tx2 + 1):
-                fname = self.get_tile(tx, ty, download)
+    def get_map(self, download=True):
+        image = Image.new("RGBA", (self.big_pixels.w, self.big_pixels.h), (200, 200, 200))
+        for ty in range(self.tiles.p1.y, self.tiles.p2.y + 1):
+            for tx in range(self.tiles.p1.x, self.tiles.p2.x + 1):
+                fname = self._get_tile(tx, ty)
                 try:
                     img1 = Image.open(fname)
                 except:
+                    logging.exception('error getting tile')
                     img1 = Image.new("RGBA", (256, 256), (200, 255, 200))
-                xp, yp = self.TILE_SIZE * (tx - self.tx1), self.TILE_SIZE * (ty - self.ty1)
-                self.map_img.paste(img1, (xp, yp))
+                xp, yp = self.TILE_SIZE * (tx - self.tiles.p1.x), self.TILE_SIZE * (ty - self.tiles.p1.y)
+                image.paste(img1, (xp, yp))
+        self.orig_img = image
 
-        mx = gpslib.distance(gpslib.Point(self.lon1, self.lat1), gpslib.Point(self.lon2, self.lat1))[0]
-        my = gpslib.distance(gpslib.Point(self.lon1, self.lat1), gpslib.Point(self.lon1, self.lat2))[0]
+        meters_x = gpslib.distance(gpslib.Point(self.lon1, self.lat1), gpslib.Point(self.lon2, self.lat1))[0]
+        meters_y = gpslib.distance(gpslib.Point(self.lon1, self.lat1), gpslib.Point(self.lon1, self.lat2))[0]
 
-        if self.correction:
-            desty = int(my * self.fullsize.x / mx)
-            self.koeff_y = float(desty) / float(self.fullsize.y)
-            self.map_img1 = self.map_img.resize((self.fullsize.x, desty), Image.BILINEAR)
-            self.fullsize.y = desty
-            self.mapsize.y = int(self.mapsize.y * self.koeff_y)
-            self.map_img = self.map_img1
-            self.calculate_size()
-        self.m_per_pix = mx / self.mapsize.x
-        self.m_per_pix_y = my / self.mapsize.y
-        if crop:
-            map_img1 = self.map_img.crop((self.xp1, self.yp1, self.xp2, self.yp2))
-            map_img1.load()
-            self.map_img_crop = map_img1
+        if self.resize:
+            desty = int(meters_y * self.big_pixels.w / meters_x)
+            self.koeff_y = float(desty) / float(self.big_pixels.h)
+            image_new = image.resize((self.big_pixels.w, desty), Image.BILINEAR)
+            self.img = image_new
+        else:
+            self.img = self.orig_img
+
+        self.m_per_pix = Point(meters_x / self.big_pixels.w, meters_y / self.big_pixels.h)
+        if self.crop:
+            self.crop_to_coords()
+
+    def crop_to_coords(self):
+        xp1, yp1 = self.lonlat2xy(self.lon1, self.lat1)
+        xp2, yp2 = self.lonlat2xy(self.lon2, self.lat2)
+        img1 = self.img.crop((xp1, yp1, xp2, yp2))
+        img1.load()
+        self.img = img1
+        xp1, yp1 = self.lonlat_to_pixel(self.lon1, self.lat1)
+        xp2, yp2 = self.lonlat_to_pixel(self.lon2, self.lat2)
+        self.big_pixels = Box(xp1, yp1, xp2, yp2)
 
     def save(self, save_file):
-        self.map_img.save(save_file, "JPEG")
+        self.img.save(save_file, "JPEG")
 
     def draw_kml(self, kml):
+        """ for now only lines """
         res = kmlr.process(kml)
-        draw = ImageDraw.Draw(self.map_img)
+        draw = ImageDraw.Draw(self.img)
 
         for l in res['lines']:
             points = []
@@ -140,68 +183,58 @@ class MapProvider(object):
                 points.append(self.lonlat2xy(p[0], p[1]))
             draw.line(points)
 
-    def enhance(self, *args, **kw):
-        pass
-
-class GmapMap(MapProvider):
-
     def enhance(self, brightness=1.0, contrast=1.0, saturation=1.0, sharpness=1.0):
         if brightness != 1.0:
-            self.map_img = ImageEnhance.Brightness(self.map_img).enhance(brightness)
+            self.img = ImageEnhance.Brightness(self.img).enhance(brightness)
         elif contrast != 1.0:
-            self.map_img = ImageEnhance.Contrast(self.map_img).enhance(contrast)
+            self.img = ImageEnhance.Contrast(self.img).enhance(contrast)
         if saturation != 1.0:
-            self.map_img = ImageEnhance.Color(self.map_img).enhance(saturation)
+            self.img = ImageEnhance.Color(self.img).enhance(saturation)
         if sharpness != 1.0:
-            self.map_img = ImageEnhance.Sharpness(self.map_img).enhance(sharpness)
+            self.img = ImageEnhance.Sharpness(self.img).enhance(sharpness)
 
+
+class GmapMap(MapProvider):
+    path = 'gmap'
+    ext = 'jpg'
 
     def lonlat_to_pixel(self, lon, lat):
         """Перевод из географических координат в координаты на полной карте"""
         num = 2. ** self.zoom # число тайлов
-        numpix = self.TILE_SIZE * num # пикселей на карте
-        x = int((180. + lon) * numpix / 360.)
+        num_pix = self.TILE_SIZE * num  # пикселей на карте
+        x = int((180. + lon) * num_pix / 360.)
         c = math.sin(math.radians(lat))
         cm = math.pi * 2
         y0 = cm / 2 + 0.5 * math.log((1 + c)/(1 - c), math.e)
-        y = int(numpix - y0 * numpix / cm)
+        y = int(num_pix - y0 * num_pix / cm)
         return x, y
 
     def pixel_to_lonlat(self, gx, gy):
         """Перевод координат на полной карте в географические координаты"""
         num = 2. ** self.zoom # число тайлов
-        numpix = self.TILE_SIZE * num
-        #sizex = 360.0 / num
-        lon = gx * 360. / numpix - 180.
+        num_pix = self.TILE_SIZE * num
+        lon = gx * 360. / num_pix - 180.
         cm = math.pi * 2
-        y1 = (numpix - gy) * cm / numpix - cm / 2
+        y1 = (num_pix - gy) * cm / num_pix - cm / 2
         lat = math.degrees(math.atan(math.sinh(y1)))
         return lon, lat
 
-    def get_tile(self, tx, ty, download=True):
-        vers = 92
-        fname = os.path.join('cache', str(self.zoom), '%i_%i.jpg' % (tx, ty))
-        if not os.path.isdir(os.path.dirname(fname)):
-            os.makedirs(os.path.dirname(fname))
-        if not os.path.isfile(fname) and download:
-            random.seed()
-            num = random.choice([0, 1])
-            s = 'Galileo'
-            gal = s[:random.choice(range(1, len(s) + 1))]
-            url = "http://khm%s.google.com/kh/v=%s&x=%i&y=%i&z=%s&s=%s" % (num, vers, tx, ty, self.zoom, gal)
-            print "getting %i x %i" % (tx, ty)
-            urllib.urlretrieve(url, fname)
-        if os.path.isfile(fname):
-            a = os.stat(fname)
-            if a.st_size < 5000:
-                print "invalid file?"
-                os.unlink(fname)
-        return fname
+    def get_tile(self, fname, tx, ty):
+        version = 92
+        random.seed()
+        num = random.choice([0, 1])
+        s = 'Galileo'
+        gal = s[:random.choice(range(1, len(s) + 1))]
+        url = "http://khm%s.google.com/kh/v=%s&x=%i&y=%i&z=%s&s=%s" % (num, version, tx, ty, self.zoom, gal)
+        urllib.urlretrieve(url, fname)
+
 
 class OsmMap(MapProvider):
+    path = 'osm'
+    ext = 'png'
     nums = ['a', 'b', 'c']
     url = 'http://%(num)s.tile.openstreetmap.org/%(z)s/%(x)s/%(y)s.png'
-    path = 'osm'
+
     def lonlat_to_pixel(self, lon, lat):
         lat_rad = math.radians(lat)
         n = 2.0 ** self.zoom
@@ -216,32 +249,25 @@ class OsmMap(MapProvider):
         lat_deg = math.degrees(lat_rad)
         return lon_deg, lat_deg
 
-    def get_tile(self, tx, ty, download=True):
-        fname = os.path.join('cache', self.path, str(self.zoom), '%i_%i.png' % (tx, ty))
-        if not os.path.isdir(os.path.dirname(fname)):
-            os.makedirs(os.path.dirname(fname))
-        if not os.path.isfile(fname) and download:
-            random.seed()
-            num = random.choice(self.nums)
-            url = self.url % {'num':num, 'z':self.zoom, 'x':tx, 'y':ty}
-            print "getting %i x %i" % (tx, ty)
-            urllib.urlretrieve(url, fname)
-        if os.path.isfile(fname):
-            a = os.stat(fname)
-#            if a.st_size < 5000:
-#                print "invalid file?"
-#                os.unlink(fname)
-        return fname
+    def get_tile(self, fname, tx, ty):
+        random.seed()
+        num = random.choice(self.nums)
+        url = self.url % {'num': num, 'z': self.zoom, 'x': tx, 'y': ty}
+        urllib.urlretrieve(url, fname)
 
-class CicleMap(OsmMap):
+
+class CycleMap(OsmMap):
+    path = 'osm_cicle'
     nums = ['a', 'b']
     url = "http://%(num)s.tile.opencyclemap.org/cycle/%(z)s/%(x)s/%(y)s.png"
-    path = 'osm_cicle'
+
 
 class YandexSat(MapProvider):
-    equatorLength = 40075016.685578488 # Длина экватора
-    rn = 6378137. # Экваториальный радиус
-    e = 0.0818191908426 # Эксцентриситет
+    path = 'ya_sat'
+    ext = 'jpg'
+    equatorLength = 40075016.685578488  # Длина экватора
+    rn = 6378137.  # Экваториальный радиус
+    e = 0.0818191908426  # Эксцентриситет
 
     def lonlat_to_pixel(self, lon, lat):
         """Перевод из географических координат в координаты на полной карте"""
@@ -280,19 +306,11 @@ class YandexSat(MapProvider):
 
         return math.degrees(lonr), math.degrees(latr)
 
-    def get_tile(self, tx, ty, download=True):
-        fname = os.path.join('cache', 'yandex', str(self.zoom), '%i_%i.jpg' % (tx, ty))
-        if not os.path.isdir(os.path.dirname(fname)):
-            os.makedirs(os.path.dirname(fname))
-        if not os.path.isfile(fname) and download:
-            random.seed()
-            num = random.choice(['01', '02', '03', '04'])
-            url = "http://sat%s.maps.yandex.net/tiles?l=sat&v=1.37.0&x=%s&y=%s&z=%s&lang=ru_RU" % (num, tx, ty, self.zoom)
-            print "getting %i x %i" % (tx, ty)
-            urllib.urlretrieve(url, fname)
-        if os.path.isfile(fname):
-            a = os.stat(fname)
-        return fname
+    def get_tile(self, fname, tx, ty):
+        random.seed()
+        num = random.choice(['01', '02', '03', '04'])
+        url = "http://sat%s.maps.yandex.net/tiles?l=sat&v=1.37.0&x=%s&y=%s&z=%s&lang=ru_RU" % (num, tx, ty, self.zoom)
+        urllib.urlretrieve(url, fname)
 
 
 if __name__ == '__main__':
@@ -300,7 +318,7 @@ if __name__ == '__main__':
     lat1, lon1 = 60.3189, 29.3556
     lat2, lon2 = 60.3332, 29.3744
     zoom = 15
-    m = OsmMap()
+    m = CycleMap()
     m.set_ll(lon1, lat1, lon2, lat2, zoom)
     m.get_map()
     m.save('test_osm.jpg')

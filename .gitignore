@@ -1,11 +1,11 @@
 .idea
+cache
+maps
 *.py[co]
 *.tmp
 *.pdf
 *.jpg
 *.json
-cache
-maps
 points.txt
 *.kml
 *.sh
