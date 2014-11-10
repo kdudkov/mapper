@@ -1,9 +1,9 @@
 # coding: utf-8
 import logging
 import random
-import Image
-import ImageDraw
-import ImageEnhance
+from PIL import Image
+from PIL import ImageDraw
+from PIL import ImageEnhance
 import time
 import gpslib
 import kmlr
