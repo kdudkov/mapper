@@ -3,11 +3,14 @@
 
 import tempfile
 from optparse import OptionParser
-
-from PIL import Image
 from flask import Flask, request, send_file
 
-from gmap import YandexSat, GmapMap
+try:
+    from PIL import Image
+except:
+    import Image
+
+from maps import YandexSat
 
 app = Flask(__name__)
 
@@ -17,16 +20,6 @@ def hello():
     return "Hello World!"
 
 
-@app.route("/tms/<zoom>/")
-def tms(zoom):
-    x = int(request.args.get('x'))
-    y = int(request.args.get('y'))
-    provider = YandexSat()
-    provider.zoom = zoom
-    f = provider._get_tile(x, y)
-    return send_file(f, mimetype='image/jpeg')
-
-
 @app.route("/wms/")
 def wms():
     w = int(request.args.get('WIDTH'))
@@ -34,11 +27,11 @@ def wms():
     bbox = request.args.get('BBOX')
     lon1, lat1, lon2, lat2 = map(lambda x: float(x), bbox.split(','))
     map_ = YandexSat()
-    #map_ = GmapMap()
-    for z in range(17, 10, -1):
-        map_.set_ll(lon1, lat1, lon2, lat2, z)
+    z = 17
+    for z_ in range(17, 10, -1):
+        map_.set_ll(lon1, lat1, lon2, lat2, z_)
         if map_.big_pixels.w < w:
-            z += 1
+            z = z_ + 1
             break
     map_.set_ll(lon1, lat1, lon2, lat2, z)
     map_.get_map(download=True)

@@ -1,15 +1,23 @@
 # coding: utf-8
+
 import logging
 import random
-from PIL import Image
-from PIL import ImageDraw
-from PIL import ImageEnhance
+
 import time
 import gpslib
 import kmlr
 import os
 import math
 import urllib
+
+try:
+    from PIL import Image
+    from PIL import ImageDraw
+    from PIL import ImageEnhance
+except:
+    import Image
+    import ImageDraw
+    import ImageEnhance
 
 __author__ = 'madrider'
 
@@ -192,41 +200,6 @@ class MapProvider(object):
             self.img = ImageEnhance.Color(self.img).enhance(saturation)
         if sharpness != 1.0:
             self.img = ImageEnhance.Sharpness(self.img).enhance(sharpness)
-
-
-class GmapMap(MapProvider):
-    path = 'gmap'
-    ext = 'jpg'
-
-    def lonlat_to_pixel(self, lon, lat):
-        """Перевод из географических координат в координаты на полной карте"""
-        num = 2. ** self.zoom # число тайлов
-        num_pix = self.TILE_SIZE * num  # пикселей на карте
-        x = int((180. + lon) * num_pix / 360.)
-        c = math.sin(math.radians(lat))
-        cm = math.pi * 2
-        y0 = cm / 2 + 0.5 * math.log((1 + c)/(1 - c), math.e)
-        y = int(num_pix - y0 * num_pix / cm)
-        return x, y
-
-    def pixel_to_lonlat(self, gx, gy):
-        """Перевод координат на полной карте в географические координаты"""
-        num = 2. ** self.zoom # число тайлов
-        num_pix = self.TILE_SIZE * num
-        lon = gx * 360. / num_pix - 180.
-        cm = math.pi * 2
-        y1 = (num_pix - gy) * cm / num_pix - cm / 2
-        lat = math.degrees(math.atan(math.sinh(y1)))
-        return lon, lat
-
-    def get_tile(self, fname, tx, ty):
-        version = 92
-        random.seed()
-        num = random.choice([0, 1])
-        s = 'Galileo'
-        gal = s[:random.choice(range(1, len(s) + 1))]
-        url = "http://khm%s.google.com/kh/v=%s&x=%i&y=%i&z=%s&s=%s" % (num, version, tx, ty, self.zoom, gal)
-        urllib.urlretrieve(url, fname)
 
 
 class OsmMap(MapProvider):

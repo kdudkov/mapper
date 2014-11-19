@@ -16,7 +16,7 @@ from reportlab.pdfbase import pdfmetrics, ttfonts
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.lib.pagesizes import landscape
 
-from gmap import YandexSat, OsmMap, CycleMap
+from maps import YandexSat, OsmMap, CycleMap
 
 import gpslib
 
