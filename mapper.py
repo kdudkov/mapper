@@ -150,6 +150,9 @@ class Mapper(object):
         if self.config.get('kml'):
             logging.info('applying kml from %s', self.config['kml'])
             self.map_provider.draw_kml(self.config['kml'])
+        if self.config.get('gpx'):
+            logging.info('applying gpx from %s', self.config['gpx'])
+            self.map_provider.draw_gpx(self.config['gpx'])
         fname = os.path.join(WORKDIR, self.config['filename'] + '.jpg')
         logging.info("save to %s", fname)
         self.map_provider.save(fname)
@@ -292,14 +295,15 @@ if __name__ == '__main__':
     parser.add_option("--coords", dest="coords", help="lover bottom corner", metavar="lon,lat")
     parser.add_option("-z", "--zoom", dest="zoom", help="zoom (10-18)", metavar="n", type="int")
     parser.add_option("--deg", dest="deg", action="store_true", help="use d.dddd instead of d mm' s.sss")
-    parser.add_option("--scale", dest="scale", type="int", help="scale in meters in cm")
+    parser.add_option("--scale", dest="scale", type="float", help="scale in meters in cm")
     parser.add_option("--px", "--pages_x", dest="numx", type="int", help="n pages with")
     parser.add_option("--py", "--pages_y", dest="numy", type="int", help="n pages height")
     parser.add_option("--page_size", dest="ps", help="page format (A4, A3, etc)")
     parser.add_option("--land", dest="land", action="store_true", help="landscape page orientation", default=False)
     parser.add_option("--contrast", dest="contrast", type="float", default=1)
     parser.add_option("--bright", dest="bright", type="float", default=1)
-    parser.add_option("-k", "--kml", dest="kml", metavar="FILE", help="kml file")
+    parser.add_option("--kml", dest="kml", metavar="FILE", help="kml file")
+    parser.add_option("--gpx", dest="gpx", metavar="FILE", help="gpx file")
     parser.add_option("--dry", dest="download", action="store_false", help="do not download tiles", default=True)
 
     opts, _ = parser.parse_args()

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE WMT_MS_Capabilities SYSTEM
+        "http://giswebservices.massgis.state.ma.us/geoserver/schemas/wms/1.1.1/WMS_MS_Capabilities.dtd">
+<WMT_MS_Capabilities version="1.1.1" updateSequence="4194">
+    <Service>
+        <Name>Localhost WMS</Name>
+        <Title>1</Title>
+        <Abstract>1</Abstract>
+
+        <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple"
+                        xlink:href="http://localhost:5000/wms"/>
+
+        <Fees>NONE</Fees>
+        <AccessConstraints>NONE</AccessConstraints>
+    </Service>
+    <Capability>
+        <Request>
+            <GetCapabilities>
+                <Format>application/vnd.ogc.wms_xml</Format>
+                <DCPType>
+                    <HTTP>
+                        <Get>
+                            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple"
+                                            xlink:href="http://localhost:5000/wms?SERVICE=WMS&amp;"/>
+                        </Get>
+
+                    </HTTP>
+                </DCPType>
+            </GetCapabilities>
+            <GetMap>
+                <Format>image/jpeg</Format>
+                <DCPType>
+                    <HTTP>
+                        <Get>
+                            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple"
+                                            xlink:href="http://localhost:5000/wms?SERVICE=WMS&amp;"/>
+                        </Get>
+                    </HTTP>
+                </DCPType>
+            </GetMap>
+
+        </Request>
+
+        <Layer queryable="0">
+            <SRS>EPSG:4326</SRS>
+            <CRS>EPSG:4326</CRS>
+            <Layer queryable="0">
+                <Name>Yandex sat</Name>
+                <Title>Yandex sat</Title>
+                <Format>image/jpeg</Format>
+                <LatLonBoundingBox minx="-170.0" miny="-90.0" maxx="170.0" maxy="90.0"/>
+                <Style>
+                    <Name>default</Name>
+                    <Title>visual</Title>
+                </Style>
+            </Layer>
+        </Layer>
+    </Capability>
+</WMT_MS_Capabilities>

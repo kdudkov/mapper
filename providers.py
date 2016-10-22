@@ -5,10 +5,11 @@ import random
 
 import time
 import gpslib
-import kmlr
+import kml_reader
+import gpx_reader
 import os
 import math
-import urllib
+import requests
 
 try:
     from PIL import Image
@@ -21,6 +22,7 @@ except:
 
 __author__ = 'madrider'
 
+LOG = logging.getLogger(__name__)
 
 class Point(object):
     x = None
@@ -181,15 +183,22 @@ class MapProvider(object):
         self.img.save(save_file, "JPEG")
 
     def draw_kml(self, kml):
-        """ for now only lines """
-        res = kmlr.process(kml)
-        draw = ImageDraw.Draw(self.img)
+        res = kml_reader.process(kml)
+        self.draw_lines(res)
 
-        for l in res['lines']:
+    def draw_gpx(self, gpx):
+        res = gpx_reader.process(gpx)
+        self.draw_lines(res)
+
+    def draw_lines(self, data):
+        draw = ImageDraw.Draw(self.img)
+        for l in data['lines']:
             points = []
             for p in l['coords']:
-                points.append(self.lonlat2xy(p[0], p[1]))
-            draw.line(points)
+                points.append(self.lonlat2xy(p[1], p[0]))
+            draw.line(points, fill=(255, 255, 255, 128), width=2)
+            # for p in data['points']:
+            #     draw.point((self.lonlat2xy(p['lon'], p['lat'])))
 
     def enhance(self, brightness=1.0, contrast=1.0, saturation=1.0, sharpness=1.0):
         if brightness != 1.0:
@@ -226,7 +235,11 @@ class OsmMap(MapProvider):
         random.seed()
         num = random.choice(self.nums)
         url = self.url % {'num': num, 'z': self.zoom, 'x': tx, 'y': ty}
-        urllib.urlretrieve(url, fname)
+        r = requests.get(url, stream=True)
+        if r.status_code == 200:
+            with open(fname, 'wb') as f:
+                for chunk in r.iter_content(1024):
+                    f.write(chunk)
 
 
 class CycleMap(OsmMap):
@@ -244,8 +257,8 @@ class YandexSat(MapProvider):
 
     def lonlat_to_pixel(self, lon, lat):
         """Перевод из географических координат в координаты на полной карте"""
-        num = 2. ** self.zoom # число тайлов
-        numpix = self.TILE_SIZE * num # пикселей на карте
+        num = 2. ** self.zoom  # число тайлов
+        numpix = self.TILE_SIZE * num  # пикселей на карте
         a = numpix / self.equatorLength
         b = self.equatorLength / 2
         latr = math.radians(lat)
@@ -254,7 +267,7 @@ class YandexSat(MapProvider):
         esinLat = self.e * math.sin(latr)
         tan_temp = math.tan(math.pi / 4.0 + latr / 2.0)
         pow_temp = math.pow(math.tan(math.pi / 4.0 + math.asin(esinLat) / 2), self.e)
-        u = tan_temp / pow_temp
+        u = abs(tan_temp / pow_temp)
         mx, my = self.rn * lonr, self.rn * math.log(u)
         return int((b + mx) * a), int((b - my) * a)
 
@@ -282,8 +295,17 @@ class YandexSat(MapProvider):
     def get_tile(self, fname, tx, ty):
         random.seed()
         num = random.choice(['01', '02', '03', '04'])
-        url = "http://sat%s.maps.yandex.net/tiles?l=sat&v=1.37.0&x=%s&y=%s&z=%s&lang=ru_RU" % (num, tx, ty, self.zoom)
-        urllib.urlretrieve(url, fname)
+        url = 'https://sat{}.maps.yandex.net/tiles?l=sat&v=3.286.0&x={}&y={}&z={}&lang=ru_RU'.format(num, tx, ty,
+                                                                                                     self.zoom)
+        LOG.debug('save to %s', fname)
+        print(fname)
+        r = requests.get(url, stream=True)
+        if r.status_code == 200:
+            with open(fname, 'wb') as f:
+                for chunk in r.iter_content(1024):
+                    f.write(chunk)
+        else:
+            print(url, r.status_code)
 
 
 if __name__ == '__main__':

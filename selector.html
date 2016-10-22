@@ -12,13 +12,13 @@
             src="http://maps.googleapis.com/maps/api/js?sensor=false&libraries=geometry"></script>
 
     <script type="text/javascript">
-        var lt = new google.maps.LatLng(60.2696, 30.4075);
+        var lt = new google.maps.LatLng(59.8819, 31.8563);
         var infowindow = new google.maps.InfoWindow();
         var map;
         var linesArray = []
 
         function initialize() {
-            var latlng = new google.maps.LatLng(60.2696, 30.4075);
+            var latlng = new google.maps.LatLng(59.8819, 31.8563);
             var myOptions = {
                 zoom: 15,
                 center: latlng,
@@ -192,7 +192,7 @@
                     </div>
                 </fieldset>
 
-                <textarea id="result" class="disabled" cols="40" rows="10" disabled></textarea>
+                <div id="result" class="alert alert-success"></div>
             </form>
         </div>
     </div>
