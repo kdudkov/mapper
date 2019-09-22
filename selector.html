@@ -122,12 +122,13 @@
                 //var l2 = plusm(lt, ($('#pages_x')[0].value - 1) * (1 - perekr) * w_m + w_m, ($('#pages_y')[0].value - 1) * (1 - perekr) * h_m + h_m)
                 var fname = $('#file')[0].value + '_' + formt + '_' + scale / 100;
                 var title = $('#title')[0].value;
-                var text = 'python mapper.py --coords=' + rnd(lt.lng()) + ',' + rnd(lt.lat()) + ' --scale=' + scale / 100 + ' --page_size=' + formt;
+                var text = 'env/bin/python mapper.py --coords=' + rnd(lt.lng()) + ',' + rnd(lt.lat()) + ' --scale=' + scale / 100 + ' --page_size=' + formt;
                 if (land) text += ' --land';
                 text += " --pages_x=" + $('#pages_x')[0].value;
                 text += " --pages_y=" + $('#pages_y')[0].value;
                 text += " --file=\"" + fname + "\"";
                 text += " --title=\"" + title + "\"";
+				text += " --zoom=16";
                 $('#result').text(text);
             }
         }

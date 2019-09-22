@@ -6,7 +6,7 @@ import random
 import time
 import gpslib
 import kml_reader
-import gpx_reader
+#import gpx_reader
 import os
 import math
 import requests
@@ -180,15 +180,16 @@ class MapProvider(object):
         self.big_pixels = Box(xp1, yp1, xp2, yp2)
 
     def save(self, save_file):
-        self.img.save(save_file, "JPEG")
+        self.img.convert("RGB").save(save_file, "JPEG")
 
     def draw_kml(self, kml):
         res = kml_reader.process(kml)
         self.draw_lines(res)
 
     def draw_gpx(self, gpx):
-        res = gpx_reader.process(gpx)
-        self.draw_lines(res)
+        #res = gpx_reader.process(gpx)
+        #self.draw_lines(res)
+        pass
 
     def draw_lines(self, data):
         draw = ImageDraw.Draw(self.img)
@@ -295,7 +296,7 @@ class YandexSat(MapProvider):
     def get_tile(self, fname, tx, ty):
         random.seed()
         num = random.choice(['01', '02', '03', '04'])
-        url = 'https://sat{}.maps.yandex.net/tiles?l=sat&v=3.286.0&x={}&y={}&z={}&lang=ru_RU'.format(num, tx, ty,
+        url = 'https://sat{}.maps.yandex.net/tiles?l=sat&v=3.497.0&x={}&y={}&z={}&lang=ru_RU'.format(num, tx, ty,
                                                                                                      self.zoom)
         LOG.debug('save to %s', fname)
         print(fname)

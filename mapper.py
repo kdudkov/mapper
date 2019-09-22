@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding: utf-8
 
 import codecs
@@ -16,7 +16,7 @@ from reportlab.pdfbase import pdfmetrics, ttfonts
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.lib.pagesizes import landscape
 
-from maps import YandexSat, OsmMap, CycleMap
+from providers import YandexSat, OsmMap, CycleMap
 
 import gpslib
 
@@ -76,12 +76,12 @@ class Mapper(object):
         if opts.config:
             if not os.path.isfile(opts.config):
                 logging.error("cannot found %s", opts.config)
-                print "cannot found %s" % opts.config
+                print("cannot found %s" % opts.config)
                 sys.exit(1)
             logging.info("load config from %s", opts.config)
             with codecs.open(opts.config, 'r', encoding='utf-8') as f:
                 self.config = json.load(f)
-        for k, v in opts.__dict__.iteritems():
+        for k, v in opts.__dict__.items():
             if v:
                 self.config[k] = v
         if not self.config.get('config', ''):
@@ -138,7 +138,8 @@ class Mapper(object):
             self.config['numy'] - 1) * (1. - PEREKR)) * (self.yp2 - self.yp1)
         logging.info("we need %i px x %i px image for pdf", self.full_size[0], self.full_size[1])
         # size in meters
-        image_size_meters = map(lambda x: x / cm * self.config['scale'], self.full_size)
+        image_size_meters = list(map(lambda x: x / cm * self.config['scale'],
+            self.full_size))
         mperdegx, mperdegy = gpslib.mperdeg(self.lon1, self.lat1)
         self.lon2, self.lat2 = self.lon1 + image_size_meters[0] / mperdegx, self.lat1 - image_size_meters[1] / mperdegy
 
@@ -237,7 +238,7 @@ class Mapper(object):
         self.pdf.drawString(self.xp1, self.yp2 + 20, u'%s (1см = %iм)' % (self.config['title'], self.config['scale']))
 
         pfname = tempfile.mktemp()
-        image.save(pfname, 'JPEG')
+        image.convert('RGB').save(pfname, 'JPEG')
         self.pdf.drawImage(pfname, self.xp1, self.yp1, self.xp2 - self.xp1, self.yp2 - self.yp1)
         self.pdf.setStrokeColorRGB(0.0, 0.0, 0.0)
         self.pdf.setLineWidth(1)
@@ -310,8 +311,6 @@ if __name__ == '__main__':
     logging.basicConfig(level='INFO')
 
     if not opts.config:
-        if opts.title:
-            opts.title = opts.title.decode('utf-8')
         if not opts.filename:
             parser.error('output pdf filename required')
         if not opts.zoom:
@@ -323,6 +322,6 @@ if __name__ == '__main__':
         m = Mapper(opts)
         m.run()
     except KeyboardInterrupt:
-        print "interrupted"
+        print("interrupted")
 #    except Exception, ex:
 #        raise ex

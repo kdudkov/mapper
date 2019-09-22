@@ -1,2 +1,3 @@
 Pillow
-reportlab==2.6
+reportlab
+requests
