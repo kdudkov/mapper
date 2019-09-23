@@ -16,7 +16,7 @@ from reportlab.pdfbase import pdfmetrics, ttfonts
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.lib.pagesizes import landscape
 
-from providers import YandexSat, OsmMap, CycleMap
+from providers import YandexSat, OsmMap, CycleMap, MaxarPremium
 
 import gpslib
 
@@ -106,6 +106,8 @@ class Mapper(object):
             return OsmMap()
         elif self.config['provider'].upper() == 'OSMCYCLE':
             return CycleMap()
+        elif self.config['provider'].upper() == 'MAXAR':
+            return MaxarPremium()
         else:
             raise Exception('invalid map provider')
 

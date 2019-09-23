@@ -308,6 +308,23 @@ class YandexSat(MapProvider):
         else:
             print(url, r.status_code)
 
+class MaxarPremium(OsmMap):
+    path = 'maxar'
+    ext = 'jpg'
+
+    def get_tile(self, fname, tx, ty):
+        y1 = 2 ** self.zoom - 1 - ty
+        url = 'https://earthwatch.digitalglobe.com/earthservice/tmsaccess/tms/1.0.0/DigitalGlobe:ImageryTileService@EPSG:3857@jpg/{}/{}/{}.jpg?connectId=91e57457-aa2d-41ad-a42b-3b63a123f54a'.format(self.zoom, tx, y1)
+        LOG.debug('save to %s', fname)
+        print(fname)
+        r = requests.get(url, stream=True)
+        if r.status_code == 200:
+            with open(fname, 'wb') as f:
+                for chunk in r.iter_content(1024):
+                    f.write(chunk)
+        else:
+            print(url, r.status_code)
+
 
 if __name__ == '__main__':
 
