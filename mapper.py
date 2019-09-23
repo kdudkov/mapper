@@ -41,14 +41,20 @@ def deg2dms(deg):
         s = 0
     return d, m, s
 
+def deg2dm(deg):
+    dd = deg
+    d = int(dd)
+    dd -= d
+    m = dd * 60
+    return d, m
+
 
 def dms2deg(d, m, s):
     return d + m / 60. + s / 3600.
 
-
 class Mapper(object):
     FONT = 'Droid'
-    config = {'provider': 'YSAT', 'deg': False, 'numx': 1, 'numy': 1, 'ps': 'A4', 'bright': 1, 'contrast': 1,
+    config = {'provider': 'YSAT', 'format': 'dm', 'numx': 1, 'numy': 1, 'ps': 'A4', 'bright': 1, 'contrast': 1,
               'land': False}
 
     def __init__(self, opts):
@@ -104,15 +110,39 @@ class Mapper(object):
             raise Exception('invalid map provider')
 
     def get_grid(self):
-        if self.config['deg']:
+        if self.config['format'] == 'deg':
             grid = [1]
             for i in range(1, 5):
                 for c in [5, 2, 1]:
                     grid.append(c * pow(10, -i))
             return grid
-        else:
-            return (dms2deg(0, 30, 0), dms2deg(0, 10, 0), dms2deg(0, 1, 0), dms2deg(0, 0, 30), dms2deg(0, 0, 10),
-                    dms2deg(0, 0, 5), dms2deg(0, 0, 2), dms2deg(0, 0, 1))
+
+        if self.config['format'] == 'dms':
+            return (
+                    dms2deg(0, 30, 0),
+                    dms2deg(0, 10, 0),
+                    dms2deg(0, 1, 0),
+                    dms2deg(0, 0, 30),
+                    dms2deg(0, 0, 10),
+                    dms2deg(0, 0, 5),
+                    dms2deg(0, 0, 2),
+                    dms2deg(0, 0, 1),
+                    )
+
+        if self.config['format'] == 'dm':
+            return (
+                    dms2deg(0, 30, 0),
+                    dms2deg(0, 10, 0),
+                    dms2deg(0, 1, 0),
+                    dms2deg(0, 0.5, 0),
+                    dms2deg(0, 0.25, 0),
+                    dms2deg(0, 0.1, 0),
+                    dms2deg(0, 0.05, 0),
+                    dms2deg(0, 0.025, 0),
+                    dms2deg(0, 0.01, 0),
+                    dms2deg(0, 0.005, 0),
+                    dms2deg(0, 0.001, 0),
+                    )
 
     def get_page_size(self, ps, land=False):
         if ps.upper() in pagesizes.__dict__:
@@ -173,9 +203,12 @@ class Mapper(object):
         return int(x * koeffx), int(y * koeffy)
 
     def format_coord(self, coord):
-        if self.config['deg']:
+        if self.config['format'] == 'deg':
             return "%.4f" % coord
-        else:
+        if self.config['format'] == 'dm':
+            d, m  = deg2dm(coord)
+            return "%iº%0.3f'" % (d, m)
+        if self.config['format'] == 'dms':
             d, m, s = deg2dms(coord)
             return "%iº%0.2i'%0.2i\"" % (d, m, round(s))
 
@@ -211,23 +244,47 @@ class Mapper(object):
             yield y, degy
 
     def prepare_line(self, deg):
-        if not self.config['deg']:
+        if self.config['format'] == 'dms':
             d, m, s = deg2dms(deg)
             if m == 0 and s == 0:
                 # degree line
                 self.pdf.setStrokeAlpha(0.7)
                 self.pdf.setLineWidth(1)
                 self.pdf.setStrokeColorRGB(0, 0, 0)
+                return
             elif s == 0:
                 # minute line
                 self.pdf.setStrokeAlpha(0.5)
                 self.pdf.setLineWidth(1)
                 self.pdf.setStrokeColorRGB(0, 0, 0)
+                return
             else:
                 self.pdf.setStrokeAlpha(0.2)
                 self.pdf.setLineWidth(1)
                 self.pdf.setStrokeColorRGB(0, 0, 0)
-        else:
+                return
+
+        if self.config['format'] == 'dm':
+            d, m = deg2dm(deg)
+            if m == 0:
+                # degree line
+                self.pdf.setStrokeAlpha(0.7)
+                self.pdf.setLineWidth(1)
+                self.pdf.setStrokeColorRGB(0, 0, 0)
+                return
+            elif m == int(m):
+                # minute line
+                self.pdf.setStrokeAlpha(0.5)
+                self.pdf.setLineWidth(1)
+                self.pdf.setStrokeColorRGB(0, 0, 0)
+                return
+            else:
+                self.pdf.setStrokeAlpha(0.2)
+                self.pdf.setLineWidth(1)
+                self.pdf.setStrokeColorRGB(0, 0, 0)
+                return
+
+        if self.config['format'] == 'deg':
             self.pdf.setStrokeAlpha(0.5)
             self.pdf.setLineWidth(1)
             self.pdf.setStrokeColorRGB(0, 0, 0)

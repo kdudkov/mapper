@@ -38,7 +38,7 @@ def wms():
         img1 = map_.img.resize((w, h), Image.ANTIALIAS)
         img1.load()
         file_, fn = tempfile.mkstemp()
-        img1.save(fn, 'JPEG')
+        img1.convert('RGB').save(fn, 'JPEG')
         return send_file(fn, mimetype='image/jpeg')
 
 
